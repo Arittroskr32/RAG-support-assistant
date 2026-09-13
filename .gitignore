@@ -1,0 +1,64 @@
+# --- Personal design/reference doc, not part of the shipped system ---
+RAG_system.md
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+ENV/
+
+# --- Environment / secrets ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# --- ChromaDB persistent storage (rebuildable from data/ + KB build scripts) ---
+chroma_db/
+**/chroma_db/
+
+# --- Logs (append-only audit output) ---
+logs/
+*.log
+
+# --- Model weights / caches (guardrail base model, adapters, HF cache) ---
+models/
+*.bin
+*.safetensors
+*.gguf
+.cache/
+huggingface_cache/
+
+# --- Raw benchmark / red-team datasets (not the support-content data/) ---
+data/security_datasets/*
+!data/security_datasets/.gitkeep
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+
+# --- Evaluation outputs ---
+eval/results/
+*.results.json
+
+# --- OS / editor cruft ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# --- Redis dump (if run locally for KB-1) ---
+dump.rdb

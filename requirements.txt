@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+pydantic
+chromadb
+sentence-transformers
+transformers
+peft
+bitsandbytes
+accelerate
+torch
+anthropic
+redis
+pyyaml
+numpy
+pandas
+tqdm
+faker

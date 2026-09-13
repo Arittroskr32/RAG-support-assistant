@@ -1,0 +1,13 @@
+# Mirrors config/settings.py:SecurityThresholds — edit here to re-calibrate without
+# redeploying code. Load this at startup and fall back to the dataclass defaults if
+# the file is missing or a key isn't present.
+l3_kb_match_threshold: 0.26
+narrative_match_threshold: 0.42
+kb5_pii_threshold: 0.20
+fast_path_ceiling: 0.25
+l1_block_threshold: 0.55
+enable_l1_block: false
+enable_l2: true
+enable_l2b: true
+enable_l3: true
+enable_l8: true

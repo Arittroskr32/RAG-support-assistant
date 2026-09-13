@@ -1,0 +1,15 @@
+public:
+  clearance_level: 0
+  allowed_document_types: [public_faq, product_info]
+customer:
+  clearance_level: 1
+  allowed_document_types: [public_faq, product_info, company_info]
+partner:
+  clearance_level: 2
+  allowed_document_types: [public_faq, product_info, company_info, developer_info]
+employee:
+  clearance_level: 3
+  allowed_document_types: [public_faq, product_info, company_info, developer_info, sales_info]
+admin:
+  clearance_level: 4
+  allowed_document_types: [public_faq, product_info, company_info, developer_info, sales_info]
