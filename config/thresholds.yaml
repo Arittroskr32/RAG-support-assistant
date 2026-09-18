@@ -1,13 +1,32 @@
-# Mirrors config/settings.py:SecurityThresholds — edit here to re-calibrate without
-# redeploying code. Load this at startup and fall back to the dataclass defaults if
-# the file is missing or a key isn't present.
+# Mirrors config/settings.py:SecurityThresholds and is loaded at startup by
+# config.settings.get_thresholds(). Any key left out falls back to the dataclass default;
+# unknown keys raise. eval/calibrate_thresholds.py rewrites the calibrated values here.
 l3_kb_match_threshold: 0.26
 narrative_match_threshold: 0.42
-kb5_pii_threshold: 0.20
-fast_path_ceiling: 0.25
+kb5_pii_threshold: 0.2
+risk_distance_scale: 0.65
+fast_path_ceiling: -1.0
 l1_block_threshold: 0.55
 enable_l1_block: false
+rate_limit_window_s: 60
+rate_limit_soft: 50
+rate_limit_risk_bump: 0.2
+rate_limit_hard: 120
 enable_l2: true
+enable_l2_extended_patterns: false
 enable_l2b: true
+enable_kb2_match: true
 enable_l3: true
+enable_rbac: true
+enable_intent_narrowing: false
+enable_l6: true
+enable_retrieval_rescan: true
 enable_l8: true
+enable_presidio: false
+enable_windowed_embedding: true
+embed_window_words: 150
+embed_window_stride: 100
+retrieval_top_k: 6
+retrieval_max_distance: 0.6
+max_query_chars: 4000
+expose_block_layer: false

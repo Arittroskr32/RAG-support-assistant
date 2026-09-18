@@ -9,3 +9,8 @@ A: Go to Settings > Billing > Cancel Subscription. You'll retain access until th
 
 Q: Is there a free trial?
 A: Yes, all new accounts get a 14-day free trial with full access to core features.
+
+Q: How can I contact support?
+A: Email support@example.com or call 555-010-0199 during support hours.
+
+For urgent outages, use the status page link in your dashboard.

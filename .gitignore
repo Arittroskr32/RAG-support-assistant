@@ -26,6 +26,9 @@ ENV/
 *.pem
 *.key
 
+# --- API keys store (hashes, but still per-deployment) ---
+config/api_keys.yaml
+
 # --- ChromaDB persistent storage (rebuildable from data/ + KB build scripts) ---
 chroma_db/
 **/chroma_db/
@@ -51,6 +54,7 @@ data/security_datasets/*
 
 # --- Evaluation outputs ---
 eval/results/
+.pytest_cache/
 *.results.json
 
 # --- OS / editor cruft ---
@@ -62,3 +66,12 @@ Thumbs.db
 
 # --- Redis dump (if run locally for KB-1) ---
 dump.rdb
+
+# --- Frontend dev tooling (UI check script dependencies and outputs) ---
+node_modules/
+frontend/dev/uicheck/package-lock.json
+frontend/dev/uicheck/.chrome-profile/
+frontend/dev/uicheck/screenshots/
+
+# --- run.sh process state and logs ---
+.run/

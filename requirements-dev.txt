@@ -1,0 +1,6 @@
+# Build scripts, evaluation and tests (on top of requirements.txt).
+-r requirements.txt
+pandas==3.0.6
+tqdm==4.70.1
+faker==40.39.0
+pytest==9.1.1

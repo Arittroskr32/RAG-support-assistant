@@ -1,15 +1,36 @@
-public:
-  clearance_level: 0
-  allowed_document_types: [public_faq, product_info]
-customer:
-  clearance_level: 1
-  allowed_document_types: [public_faq, product_info, company_info]
-partner:
-  clearance_level: 2
-  allowed_document_types: [public_faq, product_info, company_info, developer_info]
-employee:
-  clearance_level: 3
-  allowed_document_types: [public_faq, product_info, company_info, developer_info, sales_info]
-admin:
-  clearance_level: 4
-  allowed_document_types: [public_faq, product_info, company_info, developer_info, sales_info]
+# KB-3: the single source of truth for RBAC.
+#
+# document_types: the minimum clearance needed to read each data/<document_type>/ folder.
+#   ingestion/metadata_tagger.py stamps this onto every chunk; a file's front-matter may
+#   RAISE it (never lower it).
+# roles: each role's clearance and the document types it may retrieve.
+#
+# Invariant (checked at load time by kb3_rbac.py): every allowed type's clearance must be
+# <= the role's clearance, otherwise that type is silently unreachable because L5 filters
+# on both conditions.
+document_types:
+  public_faq: 0
+  product_info: 0
+  company_info: 1
+  developer_info: 2
+  sales_info: 3
+
+roles:
+  public:
+    clearance_level: 0
+    allowed_document_types: [public_faq, product_info]
+  customer:
+    clearance_level: 1
+    allowed_document_types: [public_faq, product_info, company_info]
+  partner:
+    clearance_level: 2
+    allowed_document_types: [public_faq, product_info, company_info, developer_info]
+  employee:
+    clearance_level: 3
+    allowed_document_types: [public_faq, product_info, company_info, developer_info, sales_info]
+  admin:
+    clearance_level: 4
+    allowed_document_types: [public_faq, product_info, company_info, developer_info, sales_info]
+
+# Roles that don't exist fall back to this one (fail closed to the least privilege).
+default_role: public

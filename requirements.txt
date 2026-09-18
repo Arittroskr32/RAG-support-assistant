@@ -1,17 +1,26 @@
-fastapi
-uvicorn
-pydantic
-chromadb
-sentence-transformers
-transformers
-peft
-bitsandbytes
-accelerate
-torch
-anthropic
-redis
-pyyaml
-numpy
-pandas
-tqdm
-faker
+# Runtime dependencies. Versions are pinned to the set the test suite was run against, so
+# thesis results are reproducible. After installing, record your exact environment with
+#   pip freeze > requirements.lock
+# and keep that file next to your results.
+fastapi==0.141.1
+uvicorn==0.53.0
+pydantic==2.13.5
+chromadb==1.5.9
+sentence-transformers==6.0.1
+transformers==5.17.0
+torch==2.14.0
+anthropic==1.6.0                 # only for GENERATION_BACKEND=anthropic
+httpx==0.28.1                    # local LLM backend (OpenAI-compatible HTTP)
+redis==8.1.0
+pyyaml==6.0.3
+numpy==2.5.3
+python-dotenv==1.2.3
+
+# L3 guardrail (fine-tuned Llama-Guard adapter). Not exercised by the test suite, so these
+# are lower bounds — pin them to whatever `pip freeze` shows on your GPU machine.
+peft>=0.13
+accelerate>=1.0
+bitsandbytes>=0.44; sys_platform == "linux"
+
+# Optional: extra PII detection in L8 (set enable_presidio: true in config/thresholds.yaml)
+# presidio-analyzer

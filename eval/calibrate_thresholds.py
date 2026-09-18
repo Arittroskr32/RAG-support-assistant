@@ -1,61 +1,39 @@
-"""Ports `sweep_threshold_fpr_constrained` / `get_min_distances` from
-prompt-injection-test.ipynb (Step 7) so thresholds can be re-calibrated any time the
-embedder, KB-2/KB-6 population, or guardrail adapter changes — without re-running the
-notebook. Writes results to config/thresholds.yaml.
+"""Joint threshold calibration for the embedding-based detection layers.
 
-Expects data/security_datasets/{train_dataset.jsonl,test_dataset.jsonl} in the same
-`{"input_prompt": ..., "ground_truth_input": "safe"|"unsafe"}` shape used to build KB-2/KB-6.
+Why joint: a benign prompt is blocked if ANY layer fires, so calibrating KB-2 and KB-6
+to FPR <= 8% *separately* lets their false positives add up (plus L2 and L3) — which is
+how the pipeline ended at ~16% FPR. This script sweeps both thresholds together and picks
+the pair that maximizes recall of the *combined* decision
+
+    blocked = L2_regex  OR  kb2_dist < t_kb2  OR  kb6_dist < t_kb6  [OR  L3_llm]
+
+subject to combined FPR <= target.
+
+- Uses only the calibration splits from eval/splits.py (the KB-2 holdout is never inside
+  KB-2, and calib_test is excluded from reported metrics).
+- Distances use the same windowed embeddings as the live pipeline.
+- --with-l3 runs the fine-tuned guardrail on every calibration prompt (GPU recommended)
+  and includes it in the union. Without it, --l3-fpr-reserve (default 3 points) of the
+  FPR budget is held back for L3.
+- Writes the chosen thresholds into config/thresholds.yaml, leaving all other keys as they are.
+
+    python -m eval.calibrate_thresholds [--target-fpr 0.08] [--with-l3 | --l3-fpr-reserve 0.03]
 """
-import json
+import argparse
 import random
 import re
 
 import numpy as np
 import yaml
 
-from config.settings import _THRESHOLDS_YAML, SecurityThresholds
-from knowledge_bases.kb_manager import kb
+from config.settings import _THRESHOLDS_YAML, get_thresholds, reload_thresholds
+from eval.splits import get_splits
+from knowledge_bases.kb_manager import kb, split_windows
+from security import l2_pattern_filter
 
-TRAIN_PATH = "data/security_datasets/train_dataset.jsonl"
-TEST_PATH = "data/security_datasets/test_dataset.jsonl"
-TARGET_FPR_CEILING = 0.08  # stay under 8%, leaving margin below the <10% paper target
-TEST_CALIB_FRACTION = 0.25
-
-
-def get_min_distances(prompts, collection, batch_size=64):
-    dists = []
-    for i in range(0, len(prompts), batch_size):
-        batch = prompts[i:i + batch_size]
-        embs = kb.embed(batch)
-        for e in embs:
-            res = collection.query(query_embeddings=[e], n_results=1)
-            d = res["distances"][0][0] if res.get("distances") and res["distances"][0] else 1.0
-            dists.append(d)
-    return dists
-
-
-def sweep_threshold_fpr_constrained(dists, labels, target_fpr, lo=0.05, hi=0.60, step=0.01):
-    """Pick the threshold that maximizes recall while keeping FPR <= target_fpr on this
-    calibration set. Falls back to the lowest-FPR threshold found if none meet the target
-    (better to under-block than silently exceed the ceiling)."""
-    best_thresh, best_recall, best_fpr_at_best = None, -1, None
-    fallback_thresh, fallback_fpr = None, 2.0
-    for t in np.arange(lo, hi, step):
-        preds = [1 if d < t else 0 for d in dists]
-        tp = sum(1 for p, l in zip(preds, labels) if p == 1 and l == 1)
-        fp = sum(1 for p, l in zip(preds, labels) if p == 1 and l == 0)
-        fn = sum(1 for p, l in zip(preds, labels) if p == 0 and l == 1)
-        tn = sum(1 for p, l in zip(preds, labels) if p == 0 and l == 0)
-        recall = tp / (tp + fn) if (tp + fn) > 0 else 0
-        fpr = fp / (fp + tn) if (fp + tn) > 0 else 0
-        if fpr <= target_fpr and recall > best_recall:
-            best_recall, best_thresh, best_fpr_at_best = recall, t, fpr
-        if fpr < fallback_fpr:
-            fallback_fpr, fallback_thresh = fpr, t
-    if best_thresh is None:
-        print(f"  No threshold hit target FPR {target_fpr:.2%} — using lowest-FPR fallback ({fallback_fpr:.2%} FPR).")
-        return round(float(fallback_thresh), 3), fallback_fpr
-    return round(float(best_thresh), 3), best_fpr_at_best
+KB2_RANGE = (0.05, 0.60, 0.01)
+KB6_RANGE = (0.15, 0.65, 0.01)
+QUERY_BATCH = 256
 
 
 def looks_like_pwned_canary(text):
@@ -67,67 +45,116 @@ def looks_like_pwned_canary(text):
     return any(re.search(p, text, re.IGNORECASE) for p in markers)
 
 
-def _load_jsonl(path):
-    with open(path, encoding="utf-8") as f:
-        return [json.loads(line) for line in f]
+def build_calibration_pool(calib_test_sample: int = 0):
+    s = get_splits()
+    safe_train = [d for d in s["calib_train_safe"] if not looks_like_pwned_canary(d["input_prompt"])]
+    calib_test = s["calib_test"]
+    if calib_test_sample and calib_test_sample < len(calib_test):   # quick runs only
+        calib_test = random.Random(7).sample(calib_test, calib_test_sample)
+    test_unsafe = [d for d in calib_test if d.get("ground_truth_input") == "unsafe"]
+    test_safe = [d for d in calib_test
+                 if d.get("ground_truth_input") == "safe" and not looks_like_pwned_canary(d["input_prompt"])]
+    holdout = s["calib_unsafe_holdout"]
+    # Same composition/weighting as the notebook: test-distribution prompts counted twice.
+    pool = holdout + safe_train[:len(holdout) * 3] + test_unsafe * 2 + test_safe * 2
+    prompts = [d["input_prompt"] for d in pool]
+    labels = np.array([d.get("ground_truth_input") == "unsafe" for d in pool])
+    return prompts, labels
 
 
-def calibrate():
-    train_data = _load_jsonl(TRAIN_PATH)
-    test_data = _load_jsonl(TEST_PATH)
-
-    train_unsafe_all = [d for d in train_data if d.get("ground_truth_input") == "unsafe"]
-    train_safe = [d for d in train_data if d.get("ground_truth_input") == "safe"]
-
-    random.seed(42)
-    cap_size = min(5000, len(train_unsafe_all))
-    train_unsafe = random.sample(train_unsafe_all, cap_size)
-    split_idx = int(len(train_unsafe) * 0.85)
-    calib_unsafe_holdout = train_unsafe[split_idx:]   # KB-2 is built from train_unsafe[:split_idx] only
-
-    random.seed(123)
-    test_calib_slice = random.sample(test_data, int(len(test_data) * TEST_CALIB_FRACTION))
-
-    calib_train_safe = [d for d in train_safe if not looks_like_pwned_canary(d["input_prompt"])]
-    calib_test_safe = [d for d in test_calib_slice
-                        if d.get("ground_truth_input") == "safe" and not looks_like_pwned_canary(d["input_prompt"])]
-    calib_test_unsafe = [d for d in test_calib_slice if d.get("ground_truth_input") == "unsafe"]
-
-    calib_pool = (
-        calib_unsafe_holdout
-        + calib_train_safe[:len(calib_unsafe_holdout) * 3]
-        + calib_test_unsafe * 2
-        + calib_test_safe * 2
-    )
-    calib_prompts = [d["input_prompt"] for d in calib_pool]
-    calib_labels = [1 if d.get("ground_truth_input") == "unsafe" else 0 for d in calib_pool]
-
-    print(f"Calibrating on {len(calib_pool)} prompts "
-          f"({sum(calib_labels)} unsafe, {len(calib_labels) - sum(calib_labels)} safe), "
-          f"target FPR ceiling {TARGET_FPR_CEILING:.0%}...")
-
-    kb2_dists = get_min_distances(calib_prompts, kb.kb2_attacks)
-    l3_kb_match_threshold, kb2_fpr = sweep_threshold_fpr_constrained(kb2_dists, calib_labels, TARGET_FPR_CEILING)
-
-    kb6_dists = get_min_distances(calib_prompts, kb.kb6_narrative)
-    narrative_match_threshold, kb6_fpr = sweep_threshold_fpr_constrained(
-        kb6_dists, calib_labels, TARGET_FPR_CEILING, lo=0.15, hi=0.65)
-
-    print(f"Calibrated L3 KB match threshold: {l3_kb_match_threshold} (calib FPR={kb2_fpr:.2%})")
-    print(f"Calibrated narrative match threshold: {narrative_match_threshold} (calib FPR={kb6_fpr:.2%})")
-
-    return l3_kb_match_threshold, narrative_match_threshold
+def min_distances(prompts, collection, cfg) -> np.ndarray:
+    """Windowed nearest-neighbour distance per prompt (min over its windows), batched."""
+    owners, windows = [], []
+    for i, p in enumerate(prompts):
+        ws = split_windows(p, cfg.embed_window_words, cfg.embed_window_stride) if cfg.enable_windowed_embedding else [p]
+        owners += [i] * len(ws)
+        windows += ws
+    dists = np.ones(len(prompts))
+    if collection.count() == 0:
+        return dists
+    for start in range(0, len(windows), QUERY_BATCH):
+        embs = kb.embed(windows[start:start + QUERY_BATCH])
+        res = collection.query(query_embeddings=embs, n_results=1, include=["distances"])
+        for j, d in enumerate(res["distances"]):
+            if d:
+                k = owners[start + j]
+                dists[k] = min(dists[k], d[0])
+    return dists
 
 
-def write_thresholds(l3_kb_match_threshold, narrative_match_threshold):
-    current = SecurityThresholds()
-    updated = {**current.__dict__, "l3_kb_match_threshold": l3_kb_match_threshold,
-               "narrative_match_threshold": narrative_match_threshold}
-    with open(_THRESHOLDS_YAML, "w") as f:
-        yaml.safe_dump(updated, f, sort_keys=False)
-    print(f"Wrote calibrated thresholds to {_THRESHOLDS_YAML}")
+def _rates(pred, labels):
+    tp = np.sum(pred & labels); fn = np.sum(~pred & labels)
+    fp = np.sum(pred & ~labels); tn = np.sum(~pred & ~labels)
+    recall = tp / (tp + fn) if tp + fn else 0.0
+    fpr = fp / (fp + tn) if fp + tn else 0.0
+    return float(recall), float(fpr)
+
+
+def joint_sweep(kb2_d, kb6_d, base_pred, labels, target_fpr):
+    """Returns (t_kb2, t_kb6, recall, fpr). Maximizes recall s.t. FPR <= target (ties ->
+    lower FPR); if no pair meets the target, returns the lowest-FPR pair."""
+    best, fallback = None, None
+    for t2 in np.arange(*KB2_RANGE):
+        hit2 = base_pred | (kb2_d < t2)
+        for t6 in np.arange(*KB6_RANGE):
+            recall, fpr = _rates(hit2 | (kb6_d < t6), labels)
+            cand = (round(float(t2), 3), round(float(t6), 3), recall, fpr)
+            if fpr <= target_fpr and (best is None or (recall, -fpr) > (best[2], -best[3])):
+                best = cand
+            if fallback is None or (fpr, -recall) < (fallback[3], -fallback[2]):
+                fallback = cand
+    if best is None:
+        print(f"  No threshold pair reaches FPR <= {target_fpr:.2%}; using the lowest-FPR pair "
+              f"({fallback[3]:.2%}). L2/L3 alone may already exceed the budget.")
+        return fallback
+    return best
+
+
+def calibrate(target_fpr=0.08, with_l3=False, l3_fpr_reserve=0.03, calib_test_sample=0):
+    cfg = get_thresholds()
+    prompts, labels = build_calibration_pool(calib_test_sample)
+    budget = target_fpr if with_l3 else max(target_fpr - l3_fpr_reserve, 0.0)
+    print(f"Calibrating on {len(prompts)} prompts ({labels.sum()} unsafe, {(~labels).sum()} safe); "
+          f"end-to-end FPR target {target_fpr:.0%}, budget for L2+KB-2+KB-6{'+L3' if with_l3 else ''}: {budget:.1%}")
+
+    l2_pred = np.array([l2_pattern_filter.matches_known_injection(p, cfg.enable_l2_extended_patterns)
+                        if cfg.enable_l2 else False for p in prompts])
+    base = l2_pred.copy()
+    if with_l3:
+        from security import l3_llm_guardrail
+        l3_pred = np.array([l3_llm_guardrail.classify(p) == "unsafe" for p in prompts])
+        base |= l3_pred
+        print("  L3 alone:        recall=%.2f%%  FPR=%.2f%%" % tuple(100 * x for x in _rates(l3_pred, labels)))
+    print("  L2 alone:        recall=%.2f%%  FPR=%.2f%%" % tuple(100 * x for x in _rates(l2_pred, labels)))
+
+    kb2_d = min_distances(prompts, kb.kb2_attacks, cfg)
+    kb6_d = min_distances(prompts, kb.kb6_narrative, cfg)
+    t2, t6, recall, fpr = joint_sweep(kb2_d, kb6_d, base, labels, budget)
+
+    print(f"  KB-2 alone @ {t2}: recall=%.2f%%  FPR=%.2f%%" % tuple(100 * x for x in _rates(kb2_d < t2, labels)))
+    print(f"  KB-6 alone @ {t6}: recall=%.2f%%  FPR=%.2f%%" % tuple(100 * x for x in _rates(kb6_d < t6, labels)))
+    print(f"Combined: recall={recall:.2%}  FPR={fpr:.2%}  ->  l3_kb_match_threshold={t2}, narrative_match_threshold={t6}")
+    return t2, t6
+
+
+def write_thresholds(l3_kb_match_threshold, narrative_match_threshold, path=_THRESHOLDS_YAML):
+    current = (yaml.safe_load(path.read_text()) if path.exists() else None) or {}
+    current.update(l3_kb_match_threshold=float(l3_kb_match_threshold),
+                   narrative_match_threshold=float(narrative_match_threshold))
+    path.write_text(yaml.safe_dump(current, sort_keys=False))
+    reload_thresholds()
+    print(f"Wrote calibrated thresholds to {path}")
 
 
 if __name__ == "__main__":
-    l3_thresh, narrative_thresh = calibrate()
-    write_thresholds(l3_thresh, narrative_thresh)
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--target-fpr", type=float, default=0.08, help="end-to-end FPR ceiling (paper target <10%%)")
+    ap.add_argument("--with-l3", action="store_true", help="include the guardrail LLM's decisions in the union")
+    ap.add_argument("--l3-fpr-reserve", type=float, default=0.03, help="FPR budget held back for L3 when not --with-l3")
+    ap.add_argument("--calib-test-sample", type=int, default=0,
+                    help="use only N prompts of the calib_test split (quick runs; 0 = all)")
+    ap.add_argument("--dry-run", action="store_true", help="print results without writing thresholds.yaml")
+    args = ap.parse_args()
+    t2, t6 = calibrate(args.target_fpr, args.with_l3, args.l3_fpr_reserve, args.calib_test_sample)
+    if not args.dry_run:
+        write_thresholds(t2, t6)

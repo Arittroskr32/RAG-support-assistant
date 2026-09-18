@@ -1,0 +1,8 @@
+{
+  "name": "rag-ui-check",
+  "private": true,
+  "description": "Headless-Chrome check of the chat UI against frontend/dev/mock_server.py",
+  "type": "module",
+  "scripts": { "check": "node check_ui.mjs" },
+  "dependencies": { "puppeteer-core": "^25.11.0" }
+}
