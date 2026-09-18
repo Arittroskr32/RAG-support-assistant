@@ -160,7 +160,7 @@ else
   [[ -n "$TORCH_VERSION" ]] || die "could not read the torch==<version> pin from requirements.txt"
   (( ALLOW_CPU )) || pick_torch_index
 
-  if ! "$PY" -c "import torch, sentence_transformers, chromadb, fastapi, uvicorn, httpx, faker, peft, transformers, pypdf" 2>/dev/null; then
+  if ! "$PY" -c "import torch, sentence_transformers, chromadb, fastapi, uvicorn, httpx, faker, peft, transformers, pypdf, docx, openpyxl, xlrd" 2>/dev/null; then
     warn "installing requirements (first run only; torch is large)…"
     "$PY" -m pip install -q --upgrade pip
     # install the matching CUDA build of torch first, so requirements.txt finds it satisfied

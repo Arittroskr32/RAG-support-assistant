@@ -9,6 +9,9 @@ clearance comes from knowledge_bases/rbac_policy.yaml). A folder may hold any mi
     .csv .tsv            one record per row, written as "column: value" lines
     .json                a list of objects -> one record each; a single object -> one record
     .jsonl               one record per line
+    .docx                Word: headings -> sections, list items -> "- ", tables -> records
+    .xlsx .xlsm .xls     Excel: every sheet (a section each when there are several); the first
+                         non-empty row is the header, every other row a "column: value" record
 Every format ends up as Markdown-like text, so chunking, the ingestion-time injection scan
 and the RBAC tagging are the same for all of them. Records with question/answer fields
 become "Q: ... / A: ..." pairs, so FAQ chunking keeps each pair together. Other files are
@@ -30,6 +33,7 @@ import io
 import json
 import logging
 import re
+from datetime import date, datetime, time
 from pathlib import Path
 
 import yaml
@@ -40,7 +44,10 @@ logger = logging.getLogger(__name__)
 
 EXCLUDED_DIRS = {"security_datasets"}
 TEXT_SUFFIXES = {".md", ".markdown", ".txt"}
-SUPPORTED_SUFFIXES = TEXT_SUFFIXES | {".pdf", ".csv", ".tsv", ".json", ".jsonl"}
+SUPPORTED_SUFFIXES = TEXT_SUFFIXES | {".pdf", ".csv", ".tsv", ".json", ".jsonl", ".docx", ".xlsx", ".xlsm", ".xls"}
+# Older binary formats: tell the user how to make them readable instead of just "unsupported".
+CONVERT_HINTS = {".doc": "save it as .docx", ".ppt": "save it as .pdf", ".pptx": "save it as .pdf",
+                 ".odt": "save it as .docx", ".ods": "save it as .xlsx", ".rtf": "save it as .docx"}
 SIDECAR_SUFFIX = ".meta.yaml"
 _FRONT_MATTER = re.compile(r"\A---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 _QUESTION_KEYS, _ANSWER_KEYS = ("question", "q", "query"), ("answer", "a", "response")
@@ -137,6 +144,103 @@ def _read_jsonl(path: Path) -> str:
     return records_to_text(records)
 
 
+# ------------------------------------------------------------------ tables (Excel / Word)
+
+def _cell_text(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return str(value)
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    if isinstance(value, datetime):
+        return value.date().isoformat() if value.time() == time(0) else value.isoformat(sep=" ", timespec="minutes")
+    if isinstance(value, (date, time)):
+        return value.isoformat()
+    return str(value).strip()
+
+
+def rows_to_text(rows) -> str:
+    """Table rows -> records. The first non-empty row is the header (blank or repeated names
+    are made unique); a table with only one row is kept as plain text."""
+    rows = [[_cell_text(c) for c in row] for row in rows]
+    rows = [r for r in rows if any(r)]
+    if not rows:
+        return ""
+    if len(rows) == 1:
+        return " | ".join(c for c in rows[0] if c)
+    header, seen = [], {}
+    for i, name in enumerate(rows[0], 1):
+        name = name or f"column {i}"
+        seen[name] = seen.get(name, 0) + 1
+        header.append(name if seen[name] == 1 else f"{name} {seen[name]}")
+    width = max(len(r) for r in rows)
+    header += [f"column {i}" for i in range(len(header) + 1, width + 1)]
+    return records_to_text({header[i]: v for i, v in enumerate(r) if v} for r in rows[1:])
+
+
+def _join_sections(sections: list[tuple[str, str]]) -> str:
+    """[(name, text)] -> text, with a "## name" heading only when there's more than one."""
+    sections = [(n, t) for n, t in sections if t.strip()]
+    if len(sections) == 1:
+        return sections[0][1]
+    return "\n\n".join(f"## {n}\n\n{t}" for n, t in sections)
+
+
+def _read_xlsx(path: Path) -> tuple[str, dict]:
+    from openpyxl import load_workbook
+
+    wb = load_workbook(path, read_only=True, data_only=True)   # data_only: formula results, not formulas
+    try:
+        sections = [(ws.title, rows_to_text(ws.iter_rows(values_only=True))) for ws in wb.worksheets]
+        title = (wb.properties.title or "").strip()
+    finally:
+        wb.close()
+    return _join_sections(sections), ({"title": title} if title else {})
+
+
+def _read_xls(path: Path) -> tuple[str, dict]:
+    import xlrd
+
+    book = xlrd.open_workbook(str(path))
+
+    def value(sheet, r, c):
+        cell = sheet.cell(r, c)
+        if cell.ctype == xlrd.XL_CELL_DATE:
+            return xlrd.xldate.xldate_as_datetime(cell.value, book.datemode)
+        return cell.value
+
+    sections = [(sh.name, rows_to_text([value(sh, r, c) for c in range(sh.ncols)] for r in range(sh.nrows)))
+                for sh in book.sheets()]
+    return _join_sections(sections), {}
+
+
+def _read_docx(path: Path) -> tuple[str, dict]:
+    import docx
+    from docx.table import Table
+
+    document = docx.Document(str(path))
+    parts = []
+    for block in document.iter_inner_content():          # paragraphs and tables in document order
+        if isinstance(block, Table):
+            parts.append(rows_to_text([cell.text for cell in row.cells] for row in block.rows))
+            continue
+        text = block.text.strip()
+        if not text:
+            continue
+        style = block.style.name if block.style is not None else ""
+        heading = re.match(r"Heading (\d)", style)
+        if style == "Title":
+            text = f"# {text}"
+        elif heading:
+            text = f"{'#' * min(int(heading.group(1)) + 1, 6)} {text}"
+        elif style.startswith("List"):
+            text = f"- {text}"
+        parts.append(text)
+    title = (document.core_properties.title or "").strip()
+    return "\n\n".join(p for p in parts if p), ({"title": title} if title else {})
+
+
 # ------------------------------------------------------------------ PDF
 
 def _read_pdf(path: Path) -> tuple[str, dict]:
@@ -168,9 +272,10 @@ def read_document(path: Path) -> tuple[dict, str]:
     if suffix in TEXT_SUFFIXES:
         front, text = parse_front_matter(load_text_file(path))
         meta.update(front)
-    elif suffix == ".pdf":
-        text, pdf_meta = _read_pdf(path)
-        meta = {**pdf_meta, **meta}          # an explicit sidecar title beats the PDF's own
+    elif suffix in (".pdf", ".docx", ".xlsx", ".xlsm", ".xls"):
+        reader = {".pdf": _read_pdf, ".docx": _read_docx, ".xls": _read_xls}.get(suffix, _read_xlsx)
+        text, file_meta = reader(path)
+        meta = {**file_meta, **meta}         # an explicit sidecar title beats the file's own
     elif suffix in (".csv", ".tsv"):
         text = _read_csv(path)
     elif suffix == ".json":
@@ -197,8 +302,10 @@ def load_documents(data_dir=DATA_DIR, skipped: list | None = None):
             if (not file_path.is_file() or any(p.startswith(".") for p in file_path.relative_to(root).parts)
                     or file_path.name.endswith(SIDECAR_SUFFIX)):
                 continue
-            if file_path.suffix.lower() not in SUPPORTED_SUFFIXES:
-                skipped.append((rel, f"unsupported type {file_path.suffix or '(none)'}"))
+            suffix = file_path.suffix.lower()
+            if suffix not in SUPPORTED_SUFFIXES:
+                hint = f" ({CONVERT_HINTS[suffix]})" if suffix in CONVERT_HINTS else ""
+                skipped.append((rel, f"unsupported type {file_path.suffix or '(none)'}{hint}"))
                 continue
             try:
                 meta, body = read_document(file_path)

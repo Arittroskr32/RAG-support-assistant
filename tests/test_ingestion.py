@@ -80,7 +80,8 @@ def mixed_data(tmp_path):
     (sales / "brochure.pdf").write_bytes(_tiny_pdf(["Enterprise includes SSO", "Support is 24/7"]))
     (sales / "brochure.pdf.meta.yaml").write_text("title: Enterprise brochure\nclearance_level: 4\n")
     (sales / "scan.pdf").write_bytes(_tiny_pdf([""]))
-    (sales / "contract.docx").write_bytes(b"PK\x03\x04")
+    (sales / "contract.docx").write_bytes(b"PK\x03\x04")          # corrupt: skipped, build continues
+    (sales / "deck.pptx").write_bytes(b"PK\x03\x04")
     (sales / ".hidden.md").write_text("secret")
     (faq / "faq.json").write_text(json.dumps([{"Question": "How do I reset?", "Answer": "Use Settings."},
                                               {"question": "Refunds?", "answer": "Within 30 days.", "tag": "billing"}]))
@@ -94,8 +95,10 @@ def test_every_supported_format_is_loaded(mixed_data):
     assert set(docs) == {"public_faq/faq.json", "sales_info/notes.md", "sales_info/plain.txt",
                          "sales_info/prices.csv", "sales_info/regions.tsv", "sales_info/deal.json",
                          "sales_info/log.jsonl", "sales_info/brochure.pdf"}
-    assert dict(skipped) == {"sales_info/scan.pdf": "UnreadableDocument: no text layer (scanned PDF? it would need OCR)",
-                             "sales_info/contract.docx": "unsupported type .docx"}
+    reasons = dict(skipped)
+    assert reasons.pop("sales_info/contract.docx").startswith("PackageNotFoundError")
+    assert reasons == {"sales_info/scan.pdf": "UnreadableDocument: no text layer (scanned PDF? it would need OCR)",
+                       "sales_info/deck.pptx": "unsupported type .pptx (save it as .pdf)"}
     assert docs["sales_info/prices.csv"]["text"] == "plan: Starter\nprice: $9\nseats: 1\n\nplan: Pro\nprice: $49"
     assert docs["sales_info/regions.tsv"]["text"] == "region: EMEA\nowner: Dana"
     assert docs["sales_info/deal.json"]["text"] == "customer: Acme\nterms.discount: 15%\nproducts: Pro, Add-on"
@@ -124,3 +127,63 @@ def test_mixed_formats_chunk_and_tag(mixed_data):
 def test_oversized_faq_record_is_split():
     chunks = chunk_qa_pairs("title: long\nbody: " + "word " * 400)
     assert len(chunks) > 1 and all(len(c.split()) <= MAX_CHUNK_WORDS for c in chunks)
+
+
+def test_word_documents(tmp_path):
+    docx = pytest.importorskip("docx")
+    from ingestion.loaders import load_documents
+    folder = tmp_path / "company_info"
+    folder.mkdir()
+    d = docx.Document()
+    d.core_properties.title = "Employee handbook"
+    d.add_heading("Leave", level=1)
+    d.add_paragraph("Staff get 25 days of paid leave.")
+    d.add_paragraph("Carry over up to 5 days", style="List Bullet")
+    table = d.add_table(rows=3, cols=2)
+    for r, (a, b) in enumerate([("Level", "Days"), ("Junior", "25"), ("Senior", "30")]):
+        table.cell(r, 0).text, table.cell(r, 1).text = a, b
+    d.add_heading("Remote work", level=1)
+    d.add_paragraph("Two days a week.")
+    d.save(folder / "handbook.docx")
+    (folder / "old.doc").write_bytes(b"\xd0\xcf\x11\xe0")
+    skipped = []
+    [doc] = load_documents(tmp_path, skipped)
+    assert doc["title"] == "Employee handbook"
+    assert doc["text"] == ("## Leave\n\nStaff get 25 days of paid leave.\n\n- Carry over up to 5 days\n\n"
+                           "Level: Junior\nDays: 25\n\nLevel: Senior\nDays: 30\n\n## Remote work\n\nTwo days a week.")
+    assert skipped == [("company_info/old.doc", "unsupported type .doc (save it as .docx)")]
+
+
+def test_excel_workbooks(tmp_path):
+    openpyxl = pytest.importorskip("openpyxl")
+    import datetime
+
+    from ingestion.build_kb4 import collect_chunks
+    folder = tmp_path / "sales_info"
+    folder.mkdir()
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Plans"
+    ws.append(["Plan", "Price", "Seats", "Price"])            # repeated header name
+    ws.append(["Starter", 9.0, 1, None])
+    ws.append([])                                              # blank row
+    ws.append(["Pro", 49.5, "=2*5", datetime.datetime(2026, 1, 31)])
+    wb.create_sheet("Empty")
+    faq = wb.create_sheet("FAQ")
+    faq.append(["Question", "Answer"])
+    faq.append(["Do you offer refunds?", "Within 30 days."])
+    wb.save(folder / "pricing.xlsx")
+
+    one = openpyxl.Workbook()
+    one.active.append(["Region", "Owner"])
+    one.active.append(["EMEA", "Dana"])
+    one.save(folder / "regions.xlsx")
+
+    chunks = {c["source_doc_id"]: [] for c in collect_chunks(tmp_path)}
+    for c in collect_chunks(tmp_path):
+        chunks[c["source_doc_id"]].append(c["chunk_text"])
+    assert chunks["sales_info/pricing.xlsx"] == [
+        "Pricing > Plans\nPlan: Starter\nPrice: 9\nSeats: 1\n\nPlan: Pro\nPrice: 49.5\nPrice 2: 2026-01-31",
+        "Pricing > FAQ\nQ: Do you offer refunds?\nA: Within 30 days."]
+    # a single sheet gets no "## sheet" section; formulas without a cached result are dropped
+    assert chunks["sales_info/regions.xlsx"] == ["Regions\nRegion: EMEA\nOwner: Dana"]
