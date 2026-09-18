@@ -172,7 +172,8 @@ def handle_request(query: str, user_id: str, role: str, ip: str, session_id: str
                 except Exception as e:
                     raise _Blocked("L7-error", UNAVAILABLE_MESSAGE, status=503, error=f"{type(e).__name__}: {e}")
             details.update(model=answer.model, refused=answer.refused, cited=answer.cited,
-                           invalid_citations=answer.invalid_citations, uncited=answer.uncited)
+                           invalid_citations=answer.invalid_citations, uncited=answer.uncited,
+                           echoed_tags=answer.echoed_tags)
             cited_ids = {context.citations[c] for c in answer.cited if c in context.citations}
             shown = [r for r in retrieved if r.chunk_id in cited_ids] or retrieved
             result.sources = list(dict.fromkeys(r.metadata.get("title", "untitled") for r in shown))

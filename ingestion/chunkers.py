@@ -21,7 +21,8 @@ def chunk_qa_pairs(text: str) -> list[str]:
     files that don't use the Q:/A: convention."""
     starts = [m.start() for m in _QA_START.finditer(text)]
     if not starts:
-        return [b.strip() for b in re.split(r"\n\s*\n", text) if b.strip()]
+        blocks = [b.strip() for b in re.split(r"\n\s*\n", text) if b.strip()]
+        return [c for b in blocks for c in (_pack([b], MAX_CHUNK_WORDS) if len(b.split()) > MAX_CHUNK_WORDS else [b])]
     starts.append(len(text))
     pairs = [text[a:b].strip() for a, b in zip(starts, starts[1:])]
     preamble = text[:starts[0]].strip()

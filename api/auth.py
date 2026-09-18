@@ -22,6 +22,7 @@ class Identity:
     role: str
     tenant_id: str
     authenticated: bool
+    via: str = "anonymous"   # "api_key" | "session" (browser account, api/accounts.py) | "anonymous"
 
 
 ANONYMOUS = Identity(user_id="anonymous", role="public", tenant_id="default", authenticated=False)
@@ -49,7 +50,7 @@ def load_key_store(path=None) -> dict[str, Identity]:
                 if entry["role"] not in roles:
                     raise ValueError(f"{path}: user {entry['user_id']!r} has unknown role {entry['role']!r}")
                 by_hash[entry["key_sha256"]] = Identity(entry["user_id"], entry["role"],
-                                                        entry.get("tenant_id", "default"), True)
+                                                        entry.get("tenant_id", "default"), True, "api_key")
             _cache.update(mtime=mtime, by_hash=by_hash)
         return _cache["by_hash"]
 

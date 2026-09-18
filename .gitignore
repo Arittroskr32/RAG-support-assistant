@@ -29,6 +29,12 @@ ENV/
 # --- API keys store (hashes, but still per-deployment) ---
 config/api_keys.yaml
 
+# --- Browser accounts (password hashes), session signing secret, who gets which role ---
+config/users.json
+config/users.tmp
+config/session_secret
+config/role_assignments.json
+
 # --- ChromaDB persistent storage (rebuildable from data/ + KB build scripts) ---
 chroma_db/
 **/chroma_db/

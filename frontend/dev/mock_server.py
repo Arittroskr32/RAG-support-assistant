@@ -5,12 +5,14 @@ but answers /chat with canned responses — no models, GPU, ChromaDB or LLM need
 
 Canned answers are picked by keyword: "diagram"/"steps", "table"/"compare", "chart",
 "ignore" (a blocked request), "error" (a 503); anything else gets a plain answer.
+Accounts are kept in memory: any email can register or sign in with any 8+ character
+password; emails starting with "admin" get the admin role, everyone else is public.
 """
 import json
 import time
 
 import uvicorn
-from fastapi import FastAPI, Header, Request
+from fastapi import Cookie, FastAPI, Header, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
@@ -66,15 +68,47 @@ def pick(q: str) -> str:
 
 @app.get("/info")
 def info():
-    return {"model": "llama3.1:8b (local, mock)", "backend": "local", "max_query_chars": 4000, "allow_anonymous": True}
+    return {"model": "llama3.1:8b (local, mock)", "backend": "local", "max_query_chars": 4000,
+            "allow_anonymous": True, "allow_registration": True}
+
+
+def _session_body(email):
+    return {"user_id": email, "role": "admin" if email.startswith("admin") else "public",
+            "tenant_id": "default", "authenticated": True, "via": "session"}
 
 
 @app.get("/whoami")
-def whoami(x_api_key: str | None = Header(default=None)):
+def whoami(x_api_key: str | None = Header(default=None), rag_session: str | None = Cookie(default=None)):
     if x_api_key and x_api_key != "demo":
         return JSONResponse(status_code=401, content={"detail": "Invalid or missing API key"})
-    return {"user_id": "demo-user" if x_api_key else "anonymous", "role": "customer" if x_api_key else "public",
-            "tenant_id": "default", "authenticated": bool(x_api_key)}
+    if x_api_key:
+        return {"user_id": "demo-user", "role": "customer", "tenant_id": "default", "authenticated": True, "via": "api_key"}
+    if rag_session:
+        return _session_body(rag_session)
+    return {"user_id": "anonymous", "role": "public", "tenant_id": "default", "authenticated": False, "via": "anonymous"}
+
+
+class Credentials(BaseModel):
+    email: str
+    password: str
+
+
+@app.post("/auth/register")
+@app.post("/auth/login")
+def mock_login(creds: Credentials):
+    if "@" not in creds.email or len(creds.password) < 8:
+        return JSONResponse(status_code=401, content={"detail": "Wrong email or password."})
+    response = JSONResponse(content=_session_body(creds.email.lower()))
+    response.set_cookie("rag_session", creds.email.lower(), httponly=True, samesite="strict")
+    return response
+
+
+@app.post("/auth/logout")
+def mock_logout():
+    response = JSONResponse(content={"user_id": "anonymous", "role": "public", "tenant_id": "default",
+                                     "authenticated": False, "via": "anonymous"})
+    response.delete_cookie("rag_session")
+    return response
 
 
 @app.post("/chat")

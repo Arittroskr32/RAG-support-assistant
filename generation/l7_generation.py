@@ -91,6 +91,7 @@ class GenerationResult:
     cited: list = field(default_factory=list)
     invalid_citations: list = field(default_factory=list)
     uncited: bool = False
+    echoed_tags: int = 0        # context/question tags the model copied into its answer (removed)
 
 
 def validate_citations(text: str, citations: dict) -> tuple[list, list, bool]:
@@ -98,6 +99,15 @@ def validate_citations(text: str, citations: dict) -> tuple[list, list, bool]:
     invalid = [c for c in cited if c not in citations]
     uncited = bool(citations) and not cited and ESCALATION_MESSAGE[:30] not in text
     return cited, invalid, uncited
+
+
+def strip_echoed_context(text: str, nonce: str) -> tuple[str, int]:
+    """Small local models sometimes copy whole <document-NONCE ...> blocks, or the tags alone,
+    into the answer. The nonce is this request's, so only our own delimiters can match."""
+    n = re.escape(nonce)
+    text, blocks = re.subn(rf"<document-{n}\b[^>]*>.*?</document-{n}>\s*", "", text, flags=re.DOTALL)
+    text, tags = re.subn(rf"</?(?:document|user_question)-{n}\b[^>]*>\s*", "", text)
+    return text, blocks + tags
 
 
 def _generate_local(system: str, user: str, settings) -> tuple[str, str, str]:
@@ -154,10 +164,13 @@ def generate_answer(user_query: str, context, settings=None) -> GenerationResult
     else:
         raise ValueError(f"Unknown generation_backend {settings.generation_backend!r}")
 
+    echoed = 0
+    if context.tagged:
+        text, echoed = strip_echoed_context(text, context.nonce)
     text = text.strip() or ESCALATION_MESSAGE
     cited, invalid, uncited = validate_citations(text, context.citations)
-    return GenerationResult(text, model=model, stop_reason=stop_reason,
-                            cited=cited, invalid_citations=invalid, uncited=uncited)
+    return GenerationResult(text, model=model, stop_reason=stop_reason, cited=cited,
+                            invalid_citations=invalid, uncited=uncited, echoed_tags=echoed)
 
 
 def echo_answer(context) -> GenerationResult:

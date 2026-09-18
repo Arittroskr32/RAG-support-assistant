@@ -44,6 +44,10 @@
             <div class="identity-meta" id="identityMeta">—</div>
           </div>
         </div>
+        <button class="btn btn-ghost btn-block" id="accountBtn" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+          <span id="accountBtnText">Sign in / Register</span>
+        </button>
         <div class="model-line">
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9h6v6H9zM9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg>
           <span id="modelLabel">model: —</span>
@@ -114,10 +118,10 @@
       <h2 id="settingsTitle">Settings</h2>
 
       <label class="field">
-        <span class="field-label">API key</span>
-        <input type="password" id="apiKeyInput" placeholder="rag_… (leave empty for public access)" autocomplete="off" spellcheck="false">
-        <span class="field-help">Your role and tenant come from this key. Create one with
-          <code>python -m api.create_api_key --user-id you --role customer</code>.</span>
+        <span class="field-label">API key (optional)</span>
+        <input type="password" id="apiKeyInput" placeholder="rag_… (leave empty to use your account)" autocomplete="off" spellcheck="false">
+        <span class="field-help">Usually you just sign in. A key takes priority over the signed-in account;
+          create one with <code>python -m api.create_api_key --user-id you --role customer</code>.</span>
       </label>
       <label class="check">
         <input type="checkbox" id="rememberKey">
@@ -138,6 +142,31 @@
       <div class="modal-actions">
         <button class="btn btn-ghost" value="cancel" type="submit">Close</button>
         <button class="btn btn-primary" id="saveSettingsBtn" value="save" type="submit">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ================= Account dialog ================= -->
+  <dialog class="modal" id="accountDialog" aria-labelledby="accountTitle">
+    <form class="modal-body" id="accountForm" novalidate>
+      <h2 id="accountTitle">Account</h2>
+      <div class="tabs" role="tablist" aria-label="Sign in or register">
+        <button type="button" class="tab active" id="tabLogin" role="tab" aria-selected="true">Sign in</button>
+        <button type="button" class="tab" id="tabRegister" role="tab" aria-selected="false">Register</button>
+      </div>
+      <label class="field">
+        <span class="field-label">Email</span>
+        <input type="email" id="accEmail" autocomplete="username" spellcheck="false" maxlength="254" required>
+      </label>
+      <label class="field">
+        <span class="field-label">Password</span>
+        <input type="password" id="accPassword" autocomplete="current-password" maxlength="128" required>
+        <span class="field-help" id="accHelp"></span>
+      </label>
+      <span class="test-result bad" id="accError" role="alert"></span>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" type="button" id="accCancel">Cancel</button>
+        <button class="btn btn-primary" type="submit" id="accSubmit">Sign in</button>
       </div>
     </form>
   </dialog>

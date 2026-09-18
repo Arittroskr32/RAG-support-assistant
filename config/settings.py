@@ -122,6 +122,13 @@ class APISettings:
     allow_anonymous: bool = os.getenv("ALLOW_ANONYMOUS", "true").lower() == "true"
     # Only trust X-Forwarded-For when running behind a reverse proxy you control.
     trust_forwarded_for: bool = os.getenv("TRUST_X_FORWARDED_FOR", "false").lower() == "true"
+    # Browser accounts (api/accounts.py): registered users start as the default role;
+    # role_assignments.json gives specific emails another role.
+    users_file: Path = CONFIG_DIR / "users.json"
+    role_assignments_file: Path = CONFIG_DIR / "role_assignments.json"
+    session_secret_file: Path = CONFIG_DIR / "session_secret"
+    session_ttl_s: int = int(float(os.getenv("SESSION_TTL_HOURS", "168")) * 3600)
+    allow_registration: bool = os.getenv("ALLOW_REGISTRATION", "true").lower() == "true"
 
 
 def load_thresholds(path: Path = _THRESHOLDS_YAML) -> SecurityThresholds:

@@ -7,6 +7,8 @@
 - ```mermaid blocks: size-limited; `%%{init}` directives and `click` handlers are removed
   (the UI also renders Mermaid with securityLevel "strict").
 - Markdown tables are counted (the UI renders and sanitizes them).
+- Small local models often drop the language tag (```\nflowchart TD) or put it on the next
+  line (```\nmermaid\n...). Such blocks are labelled first, so they're validated like the rest.
 """
 import json
 import math
@@ -18,6 +20,50 @@ MAX_LABELS, MAX_DATASETS, MAX_LABEL_CHARS, MAX_MERMAID_CHARS = 50, 6, 80, 4000
 _FENCE = re.compile(r"```[ \t]*(chart|mermaid)[ \t]*\n(.*?)```", re.DOTALL | re.IGNORECASE)
 _TABLE_SEP = re.compile(r"^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$", re.MULTILINE)
 _MERMAID_BAD = re.compile(r"^\s*(%%\{.*?\}%%|click\s.*)$", re.MULTILINE | re.IGNORECASE)
+_FENCE_OPEN = re.compile(r"^(\s*)```[ \t]*([\w-]*)[ \t]*$")
+_FENCE_CLOSE = re.compile(r"^\s*```\s*$")
+_MERMAID_START = re.compile(r"^(flowchart|graph|sequenceDiagram|classDiagram|stateDiagram(-v2)?|erDiagram|"
+                            r"gantt|journey|mindmap|timeline)\b")
+
+
+def _guess_language(block: list[str]) -> tuple[str, list[str]]:
+    """('mermaid' | 'chart' | '', block without a language line) for an untagged fence."""
+    body = [l for l in block if l.strip()]
+    if not body:
+        return "", block
+    first = body[0].strip()
+    if first.lower() in ("mermaid", "chart"):
+        return first.lower(), block[block.index(body[0]) + 1:]
+    if _MERMAID_START.match(first):
+        return "mermaid", block
+    joined = "\n".join(body)
+    if first.startswith("{") and '"datasets"' in joined:
+        return "chart", block
+    return "", block
+
+
+def label_untagged_fences(text: str) -> str:
+    lines, out, i = text.split("\n"), [], 0
+    while i < len(lines):
+        m = _FENCE_OPEN.match(lines[i])
+        if not m:
+            out.append(lines[i])
+            i += 1
+            continue
+        j = i + 1
+        while j < len(lines) and not _FENCE_CLOSE.match(lines[j]):
+            j += 1
+        block, opening = lines[i + 1:j], lines[i]
+        if not m.group(2):
+            lang, block = _guess_language(block)
+            if lang:
+                opening = f"{m.group(1)}```{lang}"
+        out.append(opening)
+        out.extend(block)
+        if j < len(lines):
+            out.append(lines[j])
+        i = j + 1
+    return "\n".join(out)
 
 
 def _num(v):
@@ -69,6 +115,7 @@ def clean_mermaid(src: str) -> str:
 
 def sanitize_rich_answer(text: str) -> tuple[str, dict]:
     """Returns (text with validated blocks, counts)."""
+    text = label_untagged_fences(text)
     counts = {"charts": 0, "diagrams": 0, "tables": len(_TABLE_SEP.findall(text)), "dropped": 0}
 
     def _replace(m):

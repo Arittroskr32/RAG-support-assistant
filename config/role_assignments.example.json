@@ -1,0 +1,7 @@
+{
+  "_comment": "email -> role for browser accounts. Everyone else who registers is 'public'. Roles: public, customer, partner, employee, admin (knowledge_bases/rbac_policy.yaml). Use {\"role\": ..., \"tenant_id\": ...} to also set a tenant. Changes apply immediately, also to signed-in users.",
+  "customer@example.com": "customer",
+  "partner@example.com": { "role": "partner", "tenant_id": "default" },
+  "employee@example.com": "employee",
+  "admin@example.com": "admin"
+}

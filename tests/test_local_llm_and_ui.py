@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from config.settings import SecurityThresholds
+from config.settings import MODEL_SETTINGS, SecurityThresholds
 from generation.rich_output import sanitize_rich_answer, validate_chart
 from pipeline.orchestrator import handle_request
 
@@ -26,11 +26,12 @@ def test_local_backend_is_called_with_openai_compatible_request(built_kb4, fake_
     assert r.response == "Go to Settings > Account [c1]."            # <think> stripped
     call = fake_local_llm.calls[0]
     assert call["url"].endswith("/chat/completions")
-    assert call["json"]["model"] == "llama3.1:8b" and call["json"]["stream"] is False
+    model = MODEL_SETTINGS.local_llm_model            # from .env on this machine, llama3.1:8b by default
+    assert call["json"]["model"] == model and call["json"]["stream"] is False
     system, user = call["json"]["messages"]
     assert system["role"] == "system" and "language `chart`" in system["content"] and "language `mermaid`" in system["content"]
     assert "<user_question-" in user["content"]
-    assert r.details["model"] == "local:llama3.1:8b"
+    assert r.details["model"] == f"local:{model}"
     assert r.citations and set(r.citations) == {"c1"}
 
 
@@ -109,7 +110,7 @@ def test_info_and_whoami(client):
     info = client.get("/info").json()
     assert info["backend"] == "local" and "(local)" in info["model"]
     assert client.get("/whoami", headers={"X-API-Key": "k1"}).json() == {
-        "user_id": "bob", "role": "partner", "tenant_id": "acme", "authenticated": True}
+        "user_id": "bob", "role": "partner", "tenant_id": "acme", "authenticated": True, "via": "api_key"}
     assert client.get("/whoami").json()["role"] == "public"
     assert client.get("/whoami", headers={"X-API-Key": "nope"}).status_code == 401
 
@@ -119,3 +120,35 @@ def test_public_response_shape_hides_block_layer(fake_kb, fake_guardrail):
     out = r.public()
     assert out["blocked"] is True and "blocked_at" not in out and out["citations"] == {}
     assert set(out) == {"request_id", "response", "sources", "citations", "blocked", "latency_ms"}
+
+
+# ------------------------------------------------------------------ small-model formatting slips
+
+def test_untagged_diagram_fences_are_labelled_and_validated():
+    # the three shapes llama3.2:3b produced for "Show the steps as a diagram"
+    bare = "Steps:\n```\nflowchart TD\n    A[Go to Settings]\n    A-->B\n```\nDone [c1]."
+    next_line = "Steps:\n```\nmermaid\nflowchart TD\n    A-->B\nclick A \"javascript:alert(1)\"\n```"
+    text, rich = sanitize_rich_answer(bare)
+    assert "```mermaid\nflowchart TD" in text and rich["diagrams"] == 1
+    text, rich = sanitize_rich_answer(next_line)
+    assert text.count("mermaid") == 1 and "javascript" not in text and rich["diagrams"] == 1
+    chart = '```\n{"type": "bar", "labels": ["A"], "datasets": [{"label": "n", "data": [1]}]}\n```'
+    assert sanitize_rich_answer(chart)[1]["charts"] == 1
+
+
+def test_other_code_blocks_are_left_alone():
+    text = "```mermaid\nflowchart TD\nA-->B\n```\nThen run:\n```bash\npip install x\n```\nand\n```\nplain text\n```"
+    out, rich = sanitize_rich_answer(text)
+    assert "```bash\npip install x\n```" in out and "```\nplain text\n```" in out
+    assert rich["diagrams"] == 1
+
+
+def test_echoed_context_tags_are_removed():
+    from generation.l7_generation import strip_echoed_context
+    nonce = "9cdfe59e"
+    reply = (f'<document-{nonce} citation="c1" title="General Faq" trust="internal">\nQ: How do I reset?\n'
+             f"</document-{nonce}>\n\nGo to Settings [c1].\n<user_question-{nonce}>")
+    text, n = strip_echoed_context(reply, nonce)
+    assert text.strip() == "Go to Settings [c1]." and n == 2
+    other = '<document-deadbeef citation="c1">x</document-deadbeef>'    # not this request's nonce
+    assert strip_echoed_context(other, nonce) == (other, 0)

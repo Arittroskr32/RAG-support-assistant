@@ -222,6 +222,9 @@ code { font-family: var(--mono); font-size: .88em; background: var(--code-bg); p
 .row { display: flex; align-items: center; gap: 12px; }
 .test-result { font-size: 13px; color: var(--text-2); }
 .test-result.ok { color: var(--ok); } .test-result.bad { color: var(--danger); }
+.tabs { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); }
+.tab { flex: 1; border: 0; background: transparent; color: var(--text-2); padding: 7px 10px; border-radius: calc(var(--radius-sm) - 3px); font: inherit; font-size: 14px; cursor: pointer; }
+.tab.active { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
 
 /* Toast */

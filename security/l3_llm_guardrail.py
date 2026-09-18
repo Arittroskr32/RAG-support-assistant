@@ -37,7 +37,7 @@ class GuardrailModel:
             base = AutoModelForCausalLM.from_pretrained(
                 settings.guardrail_base_model, quantization_config=bnb, device_map="auto")
         else:
-            base = AutoModelForCausalLM.from_pretrained(settings.guardrail_base_model, torch_dtype=torch.float32)
+            base = AutoModelForCausalLM.from_pretrained(settings.guardrail_base_model, dtype=torch.float32)
         self.model = PeftModel.from_pretrained(base, settings.guardrail_adapter)
         self.model.eval()
         self._lock = threading.Lock()

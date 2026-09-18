@@ -8,7 +8,7 @@ works fully offline alongside a local LLM.
 frontend/
   index.html          page structure
   css/styles.css      light/dark themes, responsive layout
-  js/api.js           /chat, /info, /whoami client (API key in session or local storage)
+  js/api.js           /chat, /info, /whoami, /auth/* client (session cookie; optional API key)
   js/render.js        Markdown, tables (+CSV), charts (Chart.js), diagrams (Mermaid)
   js/app.js           conversations, composer, settings, theme, mobile navigation
   vendor/             marked 18.0.13, DOMPurify 3.4.15, Chart.js 4.5.1, Mermaid 12.0.0
@@ -26,9 +26,9 @@ frontend/
    LM Studio, the llama.cpp server or vLLM work too: set `LOCAL_LLM_BASE_URL` and
    `LOCAL_LLM_MODEL` in `.env`.
 2. Start the assistant: `uvicorn api.main:app`
-3. Open http://localhost:8000. Without an API key you're a `public` user. To answer as another
-   role, create a key (`python -m api.create_api_key --user-id you --role customer`) and paste
-   it under **Settings**.
+3. Open http://localhost:8000 and use **Sign in / Register**. New accounts are `public`; the
+   emails listed in `config/role_assignments.json` get the role given there. Without signing
+   in you're a `public` guest. (An API key pasted under **Settings** overrides the account.)
 
 ## What the answers can contain
 

@@ -11,6 +11,7 @@ in logs/quarantine_report.jsonl for review.
 """
 import argparse
 import json
+from collections import Counter
 
 from config.settings import DATA_DIR, LOGS_DIR, get_thresholds
 from ingestion.chunkers import chunk_document
@@ -39,9 +40,11 @@ def scan_chunk(text: str, cfg, with_l3: bool = False) -> str:
     return ""
 
 
-def collect_chunks(data_dir=DATA_DIR) -> list[dict]:
+def collect_chunks(data_dir=DATA_DIR, skipped: list | None = None, formats: Counter | None = None) -> list[dict]:
     chunks = []
-    for doc in load_documents(data_dir):
+    for doc in load_documents(data_dir, skipped):
+        if formats is not None:
+            formats[doc["format"]] += 1
         for i, raw in enumerate(chunk_document(doc["text"], doc["document_type"], doc["title"])):
             chunks.append(tag_chunk(raw, doc["document_type"], doc["source_doc_id"], index=i,
                                     tenant_id=doc["tenant_id"], title=doc["title"], trust=doc["trust"],
@@ -51,7 +54,10 @@ def collect_chunks(data_dir=DATA_DIR) -> list[dict]:
 
 def build(data_dir=DATA_DIR, scan: bool = True, with_l3: bool = False):
     cfg = get_thresholds()
-    chunks = collect_chunks(data_dir)
+    skipped, formats = [], Counter()
+    chunks = collect_chunks(data_dir, skipped, formats)
+    for rel, reason in skipped:
+        print(f"  skipped data/{rel}: {reason}")
     if not chunks:
         print("No documents found under", data_dir)
         return
@@ -74,7 +80,8 @@ def build(data_dir=DATA_DIR, scan: bool = True, with_l3: bool = False):
         for c in quarantined:
             f.write(json.dumps({"chunk_id": c["chunk_id"], "source_doc_id": c["source_doc_id"],
                                 "reason": c["quarantine_reason"], "text": c["chunk_text"][:300]}) + "\n")
-    print(f"KB-4 rebuilt with {len(chunks)} chunks from {data_dir} "
+    files = ", ".join(f"{n} {fmt}" for fmt, n in sorted(formats.items()))
+    print(f"KB-4 rebuilt with {len(chunks)} chunks from {sum(formats.values())} files ({files}) in {data_dir} "
           f"({len(quarantined)} quarantined — see {QUARANTINE_REPORT.relative_to(QUARANTINE_REPORT.parents[1])}).")
 
 

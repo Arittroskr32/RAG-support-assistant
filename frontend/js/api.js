@@ -34,6 +34,19 @@ const Api = (() => {
     return { ok: res.ok, status: res.status, body };
   }
 
+  /** POST JSON without the API key (the session cookie is sent automatically, same origin). */
+  async function postJson(path, data) {
+    try {
+      const res = await fetch(path, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data || {}),
+      });
+      const body = await res.json().catch(() => ({}));
+      return { ok: res.ok, status: res.status, body };
+    } catch {
+      return { ok: false, status: 0, body: {} };
+    }
+  }
+
   /** POST /chat. Resolves to {ok, status, body}; network failures resolve with status 0. */
   async function chat(query, signal) {
     try {
@@ -52,5 +65,8 @@ const Api = (() => {
     getKey, setKey, isRemembered, chat,
     info: () => getJson("/info"),
     whoami: (key) => getJson("/whoami", key),
+    register: (email, password) => postJson("/auth/register", { email, password }),
+    login: (email, password) => postJson("/auth/login", { email, password }),
+    logout: () => postJson("/auth/logout"),
   };
 })();

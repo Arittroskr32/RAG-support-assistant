@@ -21,6 +21,8 @@
     currentId: null,
     busy: false,
     maxChars: 4000,
+    identity: null,          // last /whoami answer
+    allowRegistration: true,
   };
   state.conversations = state.saveHistory ? store.get(HISTORY_KEY, []) : [];
 
@@ -29,6 +31,7 @@
     empty: $("emptyState"), input: $("input"), send: $("sendBtn"), composer: $("composer"), charCount: $("charCount"),
     title: $("chatTitle"), status: $("statusPill"), model: $("modelLabel"), identityUser: $("identityUser"),
     identityMeta: $("identityMeta"), identityDot: $("identityDot"), dialog: $("settingsDialog"), toast: $("toast"),
+    account: $("accountDialog"), accountBtnText: $("accountBtnText"),
   };
 
   /* ---------------- helpers ---------------- */
@@ -193,8 +196,12 @@
     const base = { role: "assistant", ts: Date.now(), latency: body.latency_ms || 0, sources: [], citations: {} };
     if (res.status === 0) return { ...base, status: "error", content: "Can't reach the assistant server.",
       hint: "Start it with `uvicorn api.main:app` and reload this page." };
-    if (res.status === 401) { setTimeout(openSettings, 300);
-      return { ...base, status: "error", content: "Your API key was rejected. Update it in Settings." }; }
+    if (res.status === 401) {
+      if (Api.getKey()) { setTimeout(openSettings, 300);
+        return { ...base, status: "error", content: "Your API key was rejected. Update it in Settings." }; }
+      setTimeout(() => openAccount("login"), 300);
+      return { ...base, status: "error", content: "Please sign in to use the assistant." };
+    }
     if (res.status === 422) return { ...base, status: "error", content: "That message couldn't be sent (it may be too long)." };
     if (res.status === 429) return { ...base, status: "blocked", content: body.response || "Too many requests. Please wait a moment." };
     if (res.status === 503) return { ...base, status: "error", content: body.response || "The assistant is temporarily unavailable.",
@@ -269,8 +276,10 @@
       const res = await Api.whoami(key);
       if (res.ok) {
         const b = res.body;
+        if (key === undefined) { state.identity = b; updateAccountButton(); }
         els.identityUser.textContent = b.authenticated ? b.user_id : "Guest";
-        els.identityMeta.textContent = `role: ${b.role} · tenant: ${b.tenant_id}`;
+        els.identityUser.title = els.identityUser.textContent;
+        els.identityMeta.textContent = `role: ${b.role} · tenant: ${b.tenant_id}` + (b.via === "api_key" ? " · API key" : "");
         els.identityDot.className = "dot ok";
         return { ok: true, body: b };
       }
@@ -291,6 +300,7 @@
       els.model.textContent = `model: ${res.body.model}`;
       els.model.title = res.body.model;
       state.maxChars = res.body.max_query_chars || 4000;
+      state.allowRegistration = res.body.allow_registration !== false;
       els.input.maxLength = state.maxChars;
       els.status.textContent = "online"; els.status.className = "pill ok";
     } catch {
@@ -298,6 +308,63 @@
     }
     updateComposer();
   }
+
+  /* ---------------- account (cookie session) ---------------- */
+  let accountMode = "login";
+
+  function updateAccountButton() {
+    els.accountBtnText.textContent = state.identity && state.identity.via === "session" ? "Sign out" : "Sign in / Register";
+  }
+
+  function setAccountMode(mode) {
+    accountMode = mode === "register" && state.allowRegistration ? "register" : "login";
+    const reg = accountMode === "register";
+    $("tabLogin").classList.toggle("active", !reg); $("tabLogin").setAttribute("aria-selected", String(!reg));
+    $("tabRegister").classList.toggle("active", reg); $("tabRegister").setAttribute("aria-selected", String(reg));
+    $("tabRegister").hidden = !state.allowRegistration;
+    $("accSubmit").textContent = reg ? "Create account" : "Sign in";
+    $("accPassword").autocomplete = reg ? "new-password" : "current-password";
+    $("accHelp").textContent = (reg
+      ? "At least 8 characters. New accounts start with the public role; an administrator can give your email another role."
+      : "Your role comes from your account.")
+      + (Api.getKey() ? " Note: an API key is set in Settings, and it takes priority over this account." : "");
+    $("accError").textContent = "";
+  }
+
+  function openAccount(mode) {
+    setAccountMode(mode);
+    $("accPassword").value = "";
+    if (!els.account.open) els.account.showModal();
+    ($("accEmail").value ? $("accPassword") : $("accEmail")).focus();
+  }
+
+  $("accountBtn").addEventListener("click", async () => {
+    closeNav();
+    if (state.identity && state.identity.via === "session") {
+      await Api.logout();
+      await refreshIdentity(); notify("Signed out");
+    } else openAccount("login");
+  });
+  $("tabLogin").addEventListener("click", () => setAccountMode("login"));
+  $("tabRegister").addEventListener("click", () => setAccountMode("register"));
+  $("accCancel").addEventListener("click", () => els.account.close());
+
+  $("accountForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = $("accEmail").value.trim(), password = $("accPassword").value, err = $("accError");
+    if (!email || !password) { err.textContent = "Enter your email and password."; return; }
+    const submit = $("accSubmit"); submit.disabled = true; err.textContent = "";
+    const res = accountMode === "register" ? await Api.register(email, password) : await Api.login(email, password);
+    submit.disabled = false;
+    if (!res.ok) {
+      const d = res.body && res.body.detail;
+      err.textContent = res.status === 0 ? "Can't reach the server." : typeof d === "string" ? d : "Check the email and password.";
+      return;
+    }
+    els.account.close();
+    await refreshIdentity();
+    notify(`Signed in as ${res.body.user_id} (${res.body.role})`);
+  });
 
   /* ---------------- settings ---------------- */
   function openSettings() {
