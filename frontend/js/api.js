@@ -34,11 +34,13 @@ const Api = (() => {
     return { ok: res.ok, status: res.status, body };
   }
 
-  /** POST JSON without the API key (the session cookie is sent automatically, same origin). */
-  async function postJson(path, data) {
+  /** Send JSON with the given method. The session cookie rides along (same origin); an API
+      key, if set, is added so key-based accounts get their own history too. */
+  async function sendJson(method, path, data) {
     try {
       const res = await fetch(path, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data || {}),
+        method, headers: headers(),
+        body: data === undefined ? undefined : JSON.stringify(data || {}),
       });
       const body = await res.json().catch(() => ({}));
       return { ok: res.ok, status: res.status, body };
@@ -46,6 +48,8 @@ const Api = (() => {
       return { ok: false, status: 0, body: {} };
     }
   }
+
+  const postJson = (path, data) => sendJson("POST", path, data || {});
 
   /** POST /chat. Resolves to {ok, status, body}; network failures resolve with status 0. */
   async function chat(query, signal) {
@@ -68,5 +72,8 @@ const Api = (() => {
     register: (email, password) => postJson("/auth/register", { email, password }),
     login: (email, password) => postJson("/auth/login", { email, password }),
     logout: () => postJson("/auth/logout"),
+    getHistory: () => getJson("/history"),
+    putHistory: (conversations) => sendJson("PUT", "/history", { conversations }),
+    deleteHistory: () => sendJson("DELETE", "/history"),
   };
 })();

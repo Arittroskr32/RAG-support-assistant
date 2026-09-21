@@ -19,7 +19,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
-from api import accounts
+from api import accounts, chat_history
 from api.auth import ANONYMOUS, authenticate
 from config.settings import API_SETTINGS, MODEL_SETTINGS, PROJECT_ROOT, get_thresholds
 from generation.l7_generation import active_model_label
@@ -158,6 +158,48 @@ def logout(request: Request):
     response = JSONResponse(content=_whoami_body(ANONYMOUS))
     response.delete_cookie(accounts.COOKIE_NAME, path="/", httponly=True, samesite="strict")
     return response
+
+
+class HistoryBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    conversations: list = Field(default_factory=list)
+
+
+@app.get("/history")
+def get_history(x_api_key: str | None = Header(default=None),
+                rag_session: str | None = Cookie(default=None)):
+    """The signed-in user's saved conversations. Anonymous callers get an empty list
+    (their history lives only in the browser)."""
+    identity = _identity_or_401(x_api_key, rag_session)
+    if not identity.authenticated:
+        return {"conversations": []}
+    return {"conversations": chat_history.load(identity.user_id)}
+
+
+@app.put("/history")
+def put_history(body: HistoryBody, request: Request, x_api_key: str | None = Header(default=None),
+                rag_session: str | None = Cookie(default=None)):
+    """Replace the signed-in user's saved conversations. Requires an account; the user_id is
+    taken server-side from the session/API key, so one user can only ever write their own."""
+    _require_json(request)
+    identity = _identity_or_401(x_api_key, rag_session)
+    if not identity.authenticated:
+        raise HTTPException(status_code=403, detail="Sign in to save your chat history.")
+    try:
+        saved = chat_history.save(identity.user_id, body.conversations)
+    except ValueError:
+        raise HTTPException(status_code=413, detail="Chat history is too large to save.") from None
+    return {"conversations": saved}
+
+
+@app.delete("/history")
+def delete_history(x_api_key: str | None = Header(default=None),
+                   rag_session: str | None = Cookie(default=None)):
+    """Delete the signed-in user's saved conversations."""
+    identity = _identity_or_401(x_api_key, rag_session)
+    if identity.authenticated:
+        chat_history.clear(identity.user_id)
+    return {"conversations": []}
 
 
 @app.post("/chat")

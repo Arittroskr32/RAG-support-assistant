@@ -22,8 +22,11 @@
     busy: false,
     maxChars: 4000,
     identity: null,          // last /whoami answer
+    userId: undefined,       // whose history is currently loaded (null = guest / not signed in)
     allowRegistration: true,
   };
+  // Guests keep history in this browser; signed-in users get theirs from the server (see
+  // loadHistory / persist), which is private to their account and returns on next sign-in.
   state.conversations = state.saveHistory ? store.get(HISTORY_KEY, []) : [];
 
   const els = {
@@ -38,9 +41,35 @@
   const uid = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()));
   const current = () => state.conversations.find((c) => c.id === state.currentId) || null;
 
+  const isSignedIn = () => !!(state.identity && state.identity.authenticated);
+
+  // Serialize server saves so two quick edits can't land out of order (last write wins).
+  let saveInFlight = false, saveQueued = false;
+  async function pushHistoryToServer() {
+    if (saveInFlight) { saveQueued = true; return; }
+    saveInFlight = true;
+    try { await Api.putHistory(state.conversations); } catch { /* offline: kept in memory */ }
+    saveInFlight = false;
+    if (saveQueued) { saveQueued = false; pushHistoryToServer(); }
+  }
+
   function persist() {
     state.conversations = state.conversations.slice(0, MAX_CONVERSATIONS);
-    if (state.saveHistory) store.set(HISTORY_KEY, state.conversations);
+    if (isSignedIn()) pushHistoryToServer();
+    else if (state.saveHistory) store.set(HISTORY_KEY, state.conversations);
+  }
+
+  // Load the conversation list for whoever is signed in now: the server (private to the
+  // account) when signed in, or this browser's local history when a guest.
+  async function loadHistory() {
+    if (isSignedIn()) {
+      const res = await Api.getHistory();
+      state.conversations = (res && res.ok && Array.isArray(res.body.conversations)) ? res.body.conversations : [];
+    } else {
+      state.conversations = state.saveHistory ? store.get(HISTORY_KEY, []) : [];
+    }
+    state.currentId = null;
+    renderAll();
   }
 
   let toastTimer;
@@ -81,7 +110,8 @@
     els.convList.innerHTML = "";
     if (!state.conversations.length) {
       els.convList.appendChild(Object.assign(document.createElement("div"), {
-        className: "conv-empty", textContent: state.saveHistory ? "No conversations yet." : "History saving is off.",
+        className: "conv-empty",
+        textContent: (state.saveHistory || isSignedIn()) ? "No conversations yet." : "History saving is off.",
       }));
       return;
     }
@@ -276,7 +306,13 @@
       const res = await Api.whoami(key);
       if (res.ok) {
         const b = res.body;
-        if (key === undefined) { state.identity = b; updateAccountButton(); }
+        if (key === undefined) {
+          state.identity = b; updateAccountButton();
+          // When the signed-in identity changes (sign in, sign out, switch account), swap to
+          // that user's history. One user's chats are never shown to another.
+          const newUserId = b.authenticated ? b.user_id : null;
+          if (newUserId !== state.userId) { state.userId = newUserId; await loadHistory(); }
+        }
         els.identityUser.textContent = b.authenticated ? b.user_id : "Guest";
         els.identityUser.title = els.identityUser.textContent;
         els.identityMeta.textContent = `role: ${b.role} · tenant: ${b.tenant_id}` + (b.via === "api_key" ? " · API key" : "");
@@ -385,9 +421,12 @@
     refreshIdentity();   // restore the badge to the saved key
   });
 
-  $("clearHistoryBtn").addEventListener("click", () => {
-    if (!confirm("Delete all saved conversations from this browser?")) return;
-    state.conversations = []; state.currentId = null; store.del(HISTORY_KEY);
+  $("clearHistoryBtn").addEventListener("click", async () => {
+    const where = isSignedIn() ? "from your account" : "from this browser";
+    if (!confirm(`Delete all saved conversations ${where}?`)) return;
+    state.conversations = []; state.currentId = null;
+    if (isSignedIn()) await Api.deleteHistory();
+    else store.del(HISTORY_KEY);
     renderAll(); notify("Chat history deleted");
   });
 
