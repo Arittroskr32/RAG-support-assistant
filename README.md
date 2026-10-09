@@ -33,7 +33,8 @@ Each of those is treated as a distinct threat with a distinct mitigation layer.
 flowchart TD
     A[Request -- role/tenant from session cookie or API key] --> R[KB-1 rate limit]
     R -->|over hard limit| Z[HTTP 429]
-    R --> L2[L2 Regex Pattern Filter -- normalized text]
+    R --> L0[L0 Sanitiser -- invisible, bidi and tag characters removed]
+    L0 --> L2[L2 Regex Pattern Filter -- normalized text]
     L2 -->|BLOCK| X[Generic error response + security event log]
     L2 -->|PASS| L1[L1 Risk Scorer -- windowed embedding, KB-2 distance]
     L1 --> L2b[L2b Narrative-Jailbreak Check -- KB-6]
@@ -55,6 +56,7 @@ flowchart TD
 | Layer | Role | Backed by | Runs an LLM? |
 |---|---|---|---|
 | KB-1 rate limit | Sliding-window request count per server-side session (user id, or IP for anonymous callers); above `rate_limit_hard` → HTTP 429, above `rate_limit_soft` → risk bump | KB-1 (Redis / in-memory) | No |
+| **L0** Sanitiser | Removes zero-width, bidi-control, tag and variation-selector characters and normalises spaces and NFC on the query (and on documents at ingestion and in L6); ZWJ/ZWNJ are kept between Bangla letters so conjuncts render correctly. Removed counts are logged (`sanitiser_removed`) | — | No |
 | **L2** Pattern Filter | Regex for literal injection phrases on Unicode-normalized, zero-width-stripped, leet-folded text, plus decoded base64 blobs | — | No |
 | **L1** Risk Scorer | Embeds the query (overlapping windows for long prompts) and computes a risk score from nearest-attack distance, rate and IP reputation | KB-1, KB-2 | No |
 | **L2b** Narrative Guard | Embedding similarity to 44 categorized jailbreak *archetypes* (role-play, authority claims, fiction framing, ...) | KB-6 | No |

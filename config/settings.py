@@ -57,6 +57,7 @@ class SecurityThresholds:
     rate_limit_hard: int = 120                # above this, the request is rejected (HTTP 429)
 
     # --- Layer toggles (ablation)
+    enable_sanitiser: bool = True              # L0: strip invisible/bidi/tag characters from the query
     enable_l2: bool = True
     enable_l2_extended_patterns: bool = False  # generic "ignore previous instructions"-style
                                                # patterns; off by default because they caused

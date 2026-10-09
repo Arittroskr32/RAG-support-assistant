@@ -1,6 +1,6 @@
 """Wires the layers into one request path:
 
-    rate limit (KB-1) -> L2 regex -> L1 risk (embedding, KB-2) -> L2b (KB-6)
+    rate limit (KB-1) -> L0 sanitiser -> L2 regex -> L1 risk (embedding, KB-2) -> L2b (KB-6)
     -> KB-2 match -> L3 guardrail LLM -> L4 scope -> L5 retrieval -> L6 tagging
     -> L7 generation -> L8 output guard
 
@@ -23,7 +23,8 @@ from generation import l6_context_assembler, l7_generation
 from generation.rich_output import sanitize_rich_answer
 from retrieval.l4_query_rewriter import resolve_scope
 from retrieval.l5_secure_retrieval import secure_search
-from security import l1_risk_scorer, l2_pattern_filter, l2b_narrative_guard, l3_llm_guardrail, l8_output_guard
+from security import (l1_risk_scorer, l2_pattern_filter, l2b_narrative_guard, l3_llm_guardrail, l8_output_guard,
+                      text_sanitiser)
 from security.event_log import log_security_event, query_fingerprint
 
 GENERIC_BLOCK_MESSAGE = "Sorry, I can't help with that request."
@@ -97,6 +98,7 @@ def handle_request(query: str, user_id: str, role: str, ip: str, session_id: str
     request_id = request_id or uuid.uuid4().hex
     timings, details = {}, {}
     result = PipelineResult(request_id=request_id, response="")
+    raw_query = query
     t_start = time.perf_counter()
 
     try:
@@ -106,6 +108,15 @@ def handle_request(query: str, user_id: str, role: str, ip: str, session_id: str
         details["request_count"] = count
         if count > cfg.rate_limit_hard:
             raise _Blocked("RATE", RATE_LIMIT_MESSAGE, status=429)
+
+        # --- L0: strip invisible characters so every later layer and the model see the same text
+        if cfg.enable_sanitiser:
+            with _Timer(timings, "L0"):
+                query, report = _guarded("L0", text_sanitiser.sanitise, query)
+            if report.changed:
+                details.update(sanitiser_removed=dict(report.removed), sanitiser_spaces=report.spaces_normalised)
+            if report.joiners_kept:
+                details["sanitiser_joiners_kept"] = report.joiners_kept
 
         # --- L2: cheap regex first
         if cfg.enable_l2:
@@ -211,6 +222,6 @@ def handle_request(query: str, user_id: str, role: str, ip: str, session_id: str
             log_security_event({
                 "request_id": request_id, "user_id": user_id, "role": role, "tenant_id": tenant_id, "ip": ip,
                 "generation_mode": generation_mode, "blocked_at": result.blocked_at, "verdict": result.verdict,
-                "status_code": result.status_code, **query_fingerprint(query),
+                "status_code": result.status_code, **query_fingerprint(raw_query),
                 "retrieved_ids": result.retrieved_ids, "timings_ms": timings, **details,
             })
