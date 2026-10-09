@@ -12,6 +12,7 @@ rate_limit_window_s: 60
 rate_limit_soft: 50
 rate_limit_risk_bump: 0.2
 rate_limit_hard: 120
+enable_sanitiser: true
 enable_l2: true
 enable_l2_extended_patterns: false
 enable_l2b: true
