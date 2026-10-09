@@ -1,0 +1,15 @@
+{
+  "mode": "server",
+  "validator": "generation.rich_output:sanitize_rich_answer",
+  "render_guard": false,
+  "forms_left": [
+    "md_image",
+    "md_link",
+    "ref_def",
+    "autolink",
+    "html_img"
+  ],
+  "core_left": true,
+  "cleaned": "All products carry a 12-month warranty [c1].\n\n![warranty status](http://127.0.0.1:9999/badge.png?d=CANARY-DEV-6813)\n\nInline link: [status page](http://127.0.0.1:9999/inline?d=6813)\n\nMore details on the [warranty status page][ref].\n\nAutolink: <http://127.0.0.1:9999/auto?d=6813>\n\n<img src=\"http://127.0.0.1:9999/raw-html.png?d=6813\">\n\n[ref]: http://127.0.0.1:9999/ref?d=CANARY-DEV-6813\n",
+  "verdict": "LETS_THROUGH: md_image,md_link,ref_def,autolink,html_img"
+}

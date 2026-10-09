@@ -1,0 +1,18 @@
+{
+  "mode": "render",
+  "render_guard": true,
+  "csp_bypassed": false,
+  "verdict": "SAFE",
+  "answer_rendered": true,
+  "routed_requests": [
+    "http://127.0.0.1:8766/chat"
+  ],
+  "external_requests_attempted": [],
+  "external_requests_completed": [],
+  "requests_to_listener": [],
+  "listener_log_new_lines": 0,
+  "csp_console": [],
+  "external_imgs": [],
+  "clickable_external_links": [],
+  "csp_events": []
+}

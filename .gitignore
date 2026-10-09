@@ -81,3 +81,6 @@ frontend/dev/uicheck/screenshots/
 
 # --- run.sh process state and logs ---
 .run/
+
+# --- Pilot browser recordings (large; the JSON and PNG evidence is kept) ---
+pilot/**/out/*.har
