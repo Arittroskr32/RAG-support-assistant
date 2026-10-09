@@ -48,7 +48,8 @@ def test_l8_screens_rich_blocks_before_they_reach_the_ui(built_kb4, fake_guardra
     r = ask("How can I contact support?")
     assert "555-867-5309" not in r.response
     assert "javascript:" not in r.response and "click" not in r.response
-    assert r.details["rich"] == {"charts": 1, "diagrams": 1, "tables": 0, "dropped": 0}
+    assert r.details["rich"] == {"charts": 1, "diagrams": 1, "tables": 0, "dropped": 0,
+                                 "images_removed": 0, "links_neutralised": 0, "html_removed": 0}
 
 # ------------------------------------------------------------------ rich output validation
 

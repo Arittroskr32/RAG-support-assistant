@@ -191,8 +191,10 @@ def handle_request(query: str, user_id: str, role: str, ip: str, session_id: str
                 raise _Blocked("L8", check.text, pii_category=check.pii_category)
             final_text = check.text
             result.verdict = check.verdict
-        # Validate chart/diagram blocks only after L8 has screened the complete text.
-        final_text, rich = sanitize_rich_answer(final_text)
+        # Validate chart/diagram blocks and apply the render guard only after L8 has screened
+        # the complete text.
+        final_text, rich = sanitize_rich_answer(final_text, allowed_link_hosts=cfg.render_link_allowlist,
+                                                render_guard=cfg.enable_render_guard)
         details["rich"] = rich
         result.response = final_text
         return result

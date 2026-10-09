@@ -2,7 +2,8 @@
    from ```chart JSON blocks and Mermaid diagrams from ```mermaid blocks.
 
    Model output is untrusted. Defences, in order:
-   1. The server validates chart/mermaid blocks after the L8 output guard.
+   1. The server validates chart/mermaid blocks after the L8 output guard, removes images
+      and turns links into plain text (render guard, DECISIONS.md D-22).
    2. Markdown is rendered with marked and sanitized with DOMPurify (no scripts, styles,
       forms, iframes or event handlers survive).
    3. Chart specs are re-validated here and only whitelisted fields reach Chart.js.
@@ -210,7 +211,8 @@ const Render = (() => {
     const html = marked.parse(md, { gfm: true, breaks: false });
     container.innerHTML = DOMPurify.sanitize(html, {
       ADD_ATTR: ["data-rich-slot"],
-      FORBID_TAGS: ["style", "form", "input", "button", "textarea", "select", "iframe", "object", "embed"],
+      // No images in answers (the server already removes them; DECISIONS.md D-22).
+      FORBID_TAGS: ["img", "style", "form", "input", "button", "textarea", "select", "iframe", "object", "embed"],
       FORBID_ATTR: ["style"],
     });
 

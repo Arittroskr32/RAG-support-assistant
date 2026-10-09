@@ -70,6 +70,10 @@ class SecurityThresholds:
     enable_retrieval_rescan: bool = True       # re-run L2 on retrieved chunks at query time
     enable_l8: bool = True
     enable_presidio: bool = False              # extra NER-based PII detection in L8 (pip install presidio-analyzer)
+    # Render guard (generation/rich_output.py, DECISIONS.md D-22): removes images from answers
+    # and turns links into non-clickable text. Off only to reproduce the D1 exfiltration test.
+    enable_render_guard: bool = True
+    render_link_allowlist: tuple[str, ...] = ()  # hosts whose https:// links stay clickable
 
     # --- Embedding windowing: all-MiniLM-L6-v2 truncates at 256 word-pieces, so long
     # prompts are embedded as overlapping windows and the minimum distance is used.
@@ -144,7 +148,8 @@ def load_thresholds(path: Path = _THRESHOLDS_YAML) -> SecurityThresholds:
     unknown = set(raw) - valid_keys
     if unknown:
         raise ValueError(f"Unknown keys in {path}: {sorted(unknown)}")
-    return replace(defaults, **raw)
+    # YAML lists become tuples so the frozen dataclass stays hashable.
+    return replace(defaults, **{k: tuple(v) if isinstance(v, list) else v for k, v in raw.items()})
 
 
 @lru_cache(maxsize=1)

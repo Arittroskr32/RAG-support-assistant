@@ -23,6 +23,8 @@ enable_l6: true
 enable_retrieval_rescan: true
 enable_l8: true
 enable_presidio: false
+enable_render_guard: true
+render_link_allowlist: []
 enable_windowed_embedding: true
 embed_window_words: 150
 embed_window_stride: 100

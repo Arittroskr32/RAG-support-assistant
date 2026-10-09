@@ -65,7 +65,7 @@ flowchart TD
 | **L6** Context Assembler | Wraps chunks in `<document-NONCE ...>` tags with a per-request random nonce, strips forged tags, trust label from metadata | — | No |
 | **L7** Generation | A local LLM (Ollama / LM Studio / llama.cpp / vLLM, OpenAI-compatible API; default `llama3.1:8b`) or Claude answers only from the tagged context, citing `[cN]`, and may add a Markdown table, a ```` ```chart ```` JSON block or a ```` ```mermaid ```` diagram; errors return 503; citations validated; context tags the model copies into its answer are removed and counted (`echoed_tags`) | — | **Yes** |
 | **L8** Output Guard | Named regex scanners (API keys, JWTs, PEM keys, SSNs, Luhn-valid cards, emails, phones) + per-sentence KB-5 similarity (+ optional Presidio) on the generated answer | KB-5 | No |
-| Rich-output validation | After L8: code blocks a small model forgot to label (` ``` ` + `flowchart TD`, or `mermaid` on the next line) are labelled first; charts rebuilt from a whitelist (type, title, labels, numbers), Mermaid directives and click handlers removed (`generation/rich_output.py`) | — | No |
+| Rich-output validation | After L8: code blocks a small model forgot to label (` ``` ` + `flowchart TD`, or `mermaid` on the next line) are labelled first; charts rebuilt from a whitelist (type, title, labels, numbers), Mermaid directives and click handlers removed; render guard removes images and turns links into plain text so an answer can't send data to an external URL (`render_link_allowlist` keeps chosen hosts clickable; `generation/rich_output.py`) | — | No |
 
 Additionally, **every chunk is scanned at ingestion time** (L2 extended patterns + L2b,
 optionally L3) and flagged chunks are quarantined — they are stored but never retrievable.
