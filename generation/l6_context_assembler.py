@@ -7,10 +7,14 @@
   [DOCUMENT]/[/DOCUMENT]) is stripped from chunk text and the user question anyway.
 - The trust label comes from chunk metadata, which ingestion takes from
   config/ingestion_sources.yaml (never from the file itself), not a constant.
+- Invisible/bidi/tag characters are removed again (security.text_sanitiser), so chunks
+  indexed before ingestion-time sanitising existed can't smuggle hidden text.
 """
 import re
 import secrets
 from dataclasses import dataclass, field
+
+from security.text_sanitiser import sanitise_text
 
 _TAG_LIKE = re.compile(r"</?\s*(?:documents?|user_question)[^>]*>|\[/?\s*document\b[^\]]*\]", re.IGNORECASE)
 
@@ -20,7 +24,7 @@ def new_nonce() -> str:
 
 
 def sanitize(text: str) -> str:
-    return _TAG_LIKE.sub("[removed-tag]", text)
+    return _TAG_LIKE.sub("[removed-tag]", sanitise_text(text))
 
 
 def _attr(value: str) -> str:

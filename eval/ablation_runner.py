@@ -42,6 +42,7 @@ CANARY_DOC_TYPES = {"COMPANY": "company_info", "DEV": "developer_info", "SALES":
 
 DETECTION_FLAG_SETS = {
     "Full_Pipeline": {},
+    "No_Sanitiser": {"enable_sanitiser": False},
     "No_L2": {"enable_l2": False},
     "No_L2b": {"enable_l2b": False},
     "No_KB2_Match": {"enable_kb2_match": False},

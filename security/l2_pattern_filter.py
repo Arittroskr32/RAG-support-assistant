@@ -1,8 +1,9 @@
 """L2: high-confidence regex filter for literal injection phrases.
 
-Text is normalized first (Unicode NFKC, zero-width/bidi characters removed, whitespace
-collapsed, and a leetspeak-folded variant), and obvious base64 blobs are decoded and
-re-scanned, so trivial obfuscation doesn't bypass the patterns.
+Text is normalized first (Unicode NFKC, invisible characters removed with
+security.text_sanitiser.detector_view, whitespace collapsed, and a leetspeak-folded
+variant), and obvious base64 blobs are decoded and re-scanned, so trivial obfuscation
+doesn't bypass the patterns.
 
 The generic "ignore previous instructions" family lives in EXTENDED_PATTERNS, which is
 off by default (cfg.enable_l2_extended_patterns): prompt-injection-test.ipynb found these
@@ -13,6 +14,8 @@ import base64
 import binascii
 import re
 import unicodedata
+
+from security.text_sanitiser import detector_view
 
 CORE_PATTERNS = [
     r"you are now (in )?(dan|developer|jailbreak) mode",
@@ -37,14 +40,13 @@ EXTENDED_PATTERNS = [
 _CORE = [re.compile(p, re.IGNORECASE) for p in CORE_PATTERNS]
 _EXTENDED = [re.compile(p, re.IGNORECASE) for p in EXTENDED_PATTERNS]
 
-_INVISIBLE = re.compile(r"[­᠎​-‏‪-‮⁠-⁤﻿]")
 _LEET = str.maketrans({"0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a", "$": "s"})
 _B64_BLOB = re.compile(r"[A-Za-z0-9+/]{24,}={0,2}")
 
 
 def normalize(text: str) -> str:
     text = unicodedata.normalize("NFKC", text)
-    text = _INVISIBLE.sub("", text)
+    text = detector_view(text)
     return re.sub(r"\s+", " ", text).strip()
 
 
