@@ -12,7 +12,7 @@ PRs #1–#3; D4 is a measurement first and a fix second. All commands run from t
 
 ## D1: images and links
 
-Result and reproduction commands: [`d1/d1_result.md`](d1/d1_result.md). No model or GPU is needed
+Result and reproduction commands: [`d1/d1_result.md`](d1/d1_result.md). Step-by-step local guide for D1, D4 and the pilot items: [`LOCAL_TEST_GUIDE.md`](LOCAL_TEST_GUIDE.md). No model or GPU is needed
 for the server and render modes. `--guard off` is the same switch as `enable_render_guard: false`.
 
 ## D2 and D3
