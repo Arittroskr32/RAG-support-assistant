@@ -145,6 +145,11 @@ def main(argv=None) -> None:
           f"| Which layer fired | {acc:.0%} | {base:.0%} |",
           f"| Was an answer generated before the decision | {acc2:.0%} | {base2:.0%} |", "",
           "Accuracy well above the baseline = side channel demonstrated."]
+    errors = [g for g in order if g.endswith("-error")]
+    if errors:
+        md += ["", f"WARNING: requests failed inside the pipeline ({', '.join(errors)}); these are not "
+               "blocks. An L5-error usually means KB-4 was rebuilt while the API was running: restart "
+               "the API and re-run d4_traffic.py."]
     if a.traffic and (df.group == "unknown").any():
         md += ["", f"WARNING: {(df.group == 'unknown').sum()} requests had no matching request_id in the log "
                "(wrong --events file, or the log was rotated)."]

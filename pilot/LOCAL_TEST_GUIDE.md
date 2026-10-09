@@ -153,10 +153,16 @@ the document is in the index.
 
 ## 4. D4: response time by blocking layer
 
-Start the API again (`./run.sh --no-llm`, Ollama still running), then:
+Put the secret document in place **before** starting the API. `./run.sh` rebuilds KB-4 from
+`data/`, so the running server picks it up. Never rebuild KB-4 while the API is running: the
+server keeps a handle to the deleted index, and every request that passes the input checks then
+fails at retrieval (it shows up as an `L5-error` group in the plot). After any rebuild, restart
+the API. Check that `config/thresholds.yaml` has `fast_path_ceiling: -1.0` (step 2).
 
 ```bash
-cp pilot/d4/d4_secret_doc.md data/public_faq/ && python -m ingestion.build_kb4    # gives L8 something to catch
+cp pilot/d4/d4_secret_doc.md data/public_faq/                                     # gives L8 something to catch
+./run.sh --no-llm                                                                 # Ollama still running; wait for "Ready"
+# in another terminal:
 python -m api.create_api_key --user-id d4 --role customer                         # copy the printed key
 python pilot/d4/d4_fill_kb2.py --n 10                                             # fills the KB-2 prompts
 python pilot/d4/d4_traffic.py --api-key <key> --repeats 3                          # about 115 requests
