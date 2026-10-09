@@ -145,8 +145,8 @@ chunking keeps each pair together. Every format goes through the same chunking,
 ingestion-time injection scan and RBAC tagging, so an instruction hidden in a PDF or a
 spreadsheet cell is quarantined just like one in a Markdown file.
 
-**Per-file settings.** A file can set its `title`, `tenant_id`, `trust`, and a
-`clearance_level` that can only *raise* (never lower) its folder's clearance. Markdown and
+**Per-file settings.** A file can set its `title` and a `clearance_level` that can only
+*raise* (never lower) its folder's clearance. Markdown and
 text files take them as YAML front-matter at the top:
 ```markdown
 ---
@@ -161,6 +161,20 @@ to them, named after the file plus `.meta.yaml`:
 title: 2026 Price List
 clearance_level: 4      # can only raise the folder's clearance, never lower it
 ```
+
+**Tenant and trust are set by the server, not the file.** Which tenant owns a file (the
+boundary L5 filters on) and the trust label L6 shows the generator come from
+`config/ingestion_sources.yaml`, by where the file sits under `data/`:
+```yaml
+defaults: {tenant_id: default, trust: internal}
+sources:
+  - path: developer_info/partners/acme    # a folder or a single file; most specific wins
+    tenant_id: acme
+    trust: external                       # external | internal | verified
+```
+A `tenant_id` or `trust` in a file's front-matter or sidecar is ignored and listed when
+KB-4 is built, so a dropped-in file can't put itself into another tenant's results or
+label itself `verified`.
 
 **Skipped files are reported.** When KB-4 is built, every file that isn't used is listed with
 the reason, and the rest of the build continues:
@@ -200,12 +214,12 @@ The role and tenant always come from the server, never from the request:
 ## Repository structure
 
 ```
-config/                 # settings.py (dataclasses, paths) + thresholds.yaml (loaded at startup)
+config/                 # settings.py (dataclasses, paths) + thresholds.yaml (loaded at startup) + ingestion_sources.yaml (tenant/trust per data/ path)
 data/                   # support content, one subfolder per document_type (md/txt/pdf/docx/xlsx/csv/json/jsonl)
   security_datasets/    # train/test jsonl + generated splits.json (gitignored)
 knowledge_bases/        # kb_manager, KB-1 session log, KB-3 RBAC policy, KB-2/5/6 build scripts
 security/               # L1, L2, L2b, L3, L8, event_log
-ingestion/              # loaders (all file formats, front-matter/sidecars), chunkers, tagger, KB-4 build + scan
+ingestion/              # loaders (all file formats, front-matter/sidecars), chunkers, provenance, tagger, KB-4 build + scan
 retrieval/              # L4 scope resolver, L5 secure retrieval
 generation/             # L6 context assembler, L7 generation (local LLM / Claude), rich-output validation
 pipeline/               # orchestrator.py — the single request path used by the API and the evals

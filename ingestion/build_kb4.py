@@ -45,11 +45,14 @@ def scan_chunk(text: str, cfg, with_l3: bool = False) -> str:
 
 
 def collect_chunks(data_dir=DATA_DIR, skipped: list | None = None, formats: Counter | None = None,
-                   sanitise: bool = True) -> list[dict]:
+                   sanitise: bool = True, sources: dict | None = None,
+                   ignored: list | None = None) -> list[dict]:
     chunks = []
-    for doc in load_documents(data_dir, skipped):
+    for doc in load_documents(data_dir, skipped, sources):
         if formats is not None:
             formats[doc["format"]] += 1
+        if ignored is not None and doc["ignored_metadata"]:
+            ignored.append((doc["source_doc_id"], doc["ignored_metadata"]))
         text, title = doc["text"], doc["title"]
         if sanitise:
             text, title = sanitise_text(text), sanitise_text(title)
@@ -60,12 +63,15 @@ def collect_chunks(data_dir=DATA_DIR, skipped: list | None = None, formats: Coun
     return chunks
 
 
-def build(data_dir=DATA_DIR, scan: bool = True, with_l3: bool = False, sanitise: bool = True):
+def build(data_dir=DATA_DIR, scan: bool = True, with_l3: bool = False, sanitise: bool = True,
+          sources: dict | None = None):
     cfg = get_thresholds()
-    skipped, formats = [], Counter()
-    chunks = collect_chunks(data_dir, skipped, formats, sanitise)
+    skipped, formats, ignored = [], Counter(), []
+    chunks = collect_chunks(data_dir, skipped, formats, sanitise, sources=sources, ignored=ignored)
     for rel, reason in skipped:
         print(f"  skipped data/{rel}: {reason}")
+    for rel, keys in ignored:
+        print(f"  ignored {', '.join(keys)} in data/{rel} (set in config/ingestion_sources.yaml)")
     if not chunks:
         print("No documents found under", data_dir)
         return

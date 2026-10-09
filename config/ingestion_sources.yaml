@@ -1,0 +1,28 @@
+# Who owns each part of data/ and how much the generator should trust it.
+#
+# tenant_id is the L5 tenant boundary; trust is the label L6 shows the generator
+# (external | internal | verified). Both are decided here, by whoever runs the server,
+# and never by the files: tenant_id/trust in a file's front-matter or .meta.yaml sidecar
+# are ignored (the build lists them).
+#
+# path is relative to data/ and names a folder or a single file; the most specific match
+# wins. Anything not listed gets `defaults`.
+#
+# Example: a partner's uploads, visible only to that partner's tenant and labelled as
+# unverified content:
+#   - path: developer_info/partners/acme
+#     tenant_id: acme
+#     trust: external
+defaults:
+  tenant_id: default
+  trust: internal
+
+sources:
+  - path: product_info/product_overview.md
+    trust: verified
+  - path: company_info/about_us.md
+    trust: verified
+  - path: developer_info/api_overview.md
+    trust: verified
+  - path: sales_info/pricing_terms.md
+    trust: verified

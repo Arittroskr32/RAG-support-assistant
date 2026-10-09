@@ -21,12 +21,14 @@ Per-file metadata overrides (all optional):
 
     ---
     title: Enterprise discount policy
-    tenant_id: acme          # default: "default"
     clearance_level: 3       # may only RAISE the folder's clearance, never lower it
-    trust: verified          # shown to the generator in L6; default "internal"
     ---
 Text files take this as YAML front-matter at the top. Any file (e.g. a PDF or CSV) can use
 a sidecar next to it instead: prices.csv -> prices.csv.meta.yaml (front-matter wins).
+
+tenant_id and trust are NOT per-file settings: they come from config/ingestion_sources.yaml
+by the file's location (ingestion/provenance.py). A file that sets them is still loaded,
+but the values are ignored and listed in the document's "ignored_metadata".
 """
 import csv
 import io
@@ -39,6 +41,7 @@ from pathlib import Path
 import yaml
 
 from config.settings import DATA_DIR
+from ingestion.provenance import FILE_CONTROLLED_KEYS, load_sources, provenance_for
 
 logger = logging.getLogger(__name__)
 
@@ -289,11 +292,13 @@ def read_document(path: Path) -> tuple[dict, str]:
     return meta, text
 
 
-def load_documents(data_dir=DATA_DIR, skipped: list | None = None):
+def load_documents(data_dir=DATA_DIR, skipped: list | None = None, sources: dict | None = None):
     """Yields one dict per readable file. Files that are skipped (unsupported type, no text,
-    parse error) are appended to `skipped` as (relative path, reason) when a list is given."""
+    parse error) are appended to `skipped` as (relative path, reason) when a list is given.
+    tenant_id and trust come from `sources` (default: config/ingestion_sources.yaml)."""
     root = Path(data_dir)
     skipped = skipped if skipped is not None else []
+    sources = sources or load_sources()
     for doc_type_dir in sorted(root.iterdir()):
         if not doc_type_dir.is_dir() or doc_type_dir.name in EXCLUDED_DIRS or doc_type_dir.name.startswith("."):
             continue
@@ -312,13 +317,16 @@ def load_documents(data_dir=DATA_DIR, skipped: list | None = None):
             except Exception as e:   # one bad file must not stop the whole build
                 skipped.append((rel, f"{type(e).__name__}: {e}"))
                 continue
+            ignored = [k for k in FILE_CONTROLLED_KEYS if k in meta]
+            if ignored:
+                logger.warning("%s sets %s; ignored (set in config/ingestion_sources.yaml)", rel, ", ".join(ignored))
             yield {
                 "text": body,
                 "document_type": doc_type_dir.name,
                 "source_doc_id": rel,                          # internal only (audit log)
                 "format": file_path.suffix.lower().lstrip("."),
                 "title": str(meta.get("title") or _title_from(body, file_path)),
-                "tenant_id": str(meta.get("tenant_id", "default")),
                 "clearance_override": meta.get("clearance_level"),
-                "trust": str(meta.get("trust", "internal")),
+                **provenance_for(rel, sources),                # tenant_id, trust: server-side only
+                "ignored_metadata": ignored,
             }

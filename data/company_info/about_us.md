@@ -1,6 +1,5 @@
 ---
 title: About Us
-trust: verified
 ---
 # About Us (placeholder content)
 
