@@ -5,7 +5,8 @@
   guess the tag name.
 - Any tag-like text resembling a delimiter (<document…>, </user_question…>, legacy
   [DOCUMENT]/[/DOCUMENT]) is stripped from chunk text and the user question anyway.
-- The trust label comes from chunk metadata (front-matter `trust:`), not a constant.
+- The trust label comes from chunk metadata, which ingestion takes from
+  config/ingestion_sources.yaml (never from the file itself), not a constant.
 """
 import re
 import secrets

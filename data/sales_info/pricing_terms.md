@@ -1,6 +1,5 @@
 ---
 title: Sales & Pricing Terms
-trust: verified
 ---
 # Sales & Pricing Terms (placeholder content)
 

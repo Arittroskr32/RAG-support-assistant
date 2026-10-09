@@ -1,6 +1,5 @@
 ---
 title: API Overview
-trust: verified
 ---
 # API Overview (placeholder content)
 

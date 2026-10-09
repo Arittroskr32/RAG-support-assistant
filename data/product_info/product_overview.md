@@ -1,6 +1,5 @@
 ---
 title: Product Overview
-trust: verified
 ---
 # Product Overview (placeholder content)
 
