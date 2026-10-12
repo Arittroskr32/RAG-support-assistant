@@ -31,6 +31,33 @@ from pathlib import Path
 
 E5_MODEL = "intfloat/multilingual-e5-small"
 E5_COLLECTION = "kb4_documents_e5"
+# How a text is wrapped before E5 embeds it. "standard" is what E5 was trained with and the
+# plan's default. "tagged" is the alternative style; compare both with
+#   python -m pilot.phase_2.retrieval_eval --embedders minilm e5 e5-tagged
+# The wrapping is added on the server, after the user's or document's text arrives, and only
+# changes the embedding; it is not a trust boundary (the random L6 nonce tags are).
+PREFIX_STYLES = {
+    "standard": {"query": ("query: ", ""), "passage": ("passage: ", "")},
+    "tagged": {"query": ("<!><query> ", " <!query>"), "passage": ("<!><passage> ", " <!passage>")},
+}
+_style = "standard"
+
+
+def set_prefix_style(style: str) -> None:
+    """Choose the E5 wrapping for this process. Each style has its own E5 collection, so the
+    chunks and the questions are always wrapped the same way."""
+    global _style
+    if style not in PREFIX_STYLES:
+        raise ValueError(f"unknown E5 prefix style {style!r}; choose from {sorted(PREFIX_STYLES)}")
+    _style = style
+
+
+def prefix_style() -> str:
+    return _style
+
+
+def e5_collection_name() -> str:
+    return E5_COLLECTION if _style == "standard" else f"{E5_COLLECTION}_{_style}"
 _BN_SCRIPT = re.compile(r"[ঀ-৿]")
 # Frequent Banglish function words and question words. Two or more hits, or at least 15% of
 # the words, routes the text to the Bangla route.
@@ -74,9 +101,9 @@ class E5:
         self.model = SentenceTransformer(model_name)
         self._lock = threading.Lock()
 
-    def encode(self, texts: list[str], prefix: str) -> list[list[float]]:
+    def encode(self, texts: list[str], prefix: str, suffix: str = "") -> list[list[float]]:
         with self._lock:
-            return self.model.encode([prefix + t for t in texts], normalize_embeddings=True,
+            return self.model.encode([prefix + t + suffix for t in texts], normalize_embeddings=True,
                                      show_progress_bar=False, batch_size=32).tolist()
 
 
@@ -99,11 +126,11 @@ def set_e5(instance) -> None:
 
 
 def embed_query(texts: list[str]) -> list[list[float]]:
-    return get_e5().encode(texts, "query: ")
+    return get_e5().encode(texts, *PREFIX_STYLES[_style]["query"])
 
 
 def embed_passage(texts: list[str]) -> list[list[float]]:
-    return get_e5().encode(texts, "passage: ")
+    return get_e5().encode(texts, *PREFIX_STYLES[_style]["passage"])
 
 
 # --------------------------------------------------------------------------- E5 collection
@@ -114,7 +141,7 @@ def build_e5_collection(kb=None) -> int:
     if kb is None:
         from knowledge_bases.kb_manager import kb
     src = kb.kb4_documents.get(include=["documents", "metadatas"])
-    coll = kb.reset_collection(E5_COLLECTION)
+    coll = kb.reset_collection(e5_collection_name())
     if src["ids"]:
         kb.add_batched(coll, ids=src["ids"], documents=src["documents"],
                        embeddings=embed_passage(src["documents"]), metadatas=src["metadatas"])
@@ -124,7 +151,7 @@ def build_e5_collection(kb=None) -> int:
 def e5_collection(kb=None):
     if kb is None:
         from knowledge_bases.kb_manager import kb
-    return kb._get_or_create(E5_COLLECTION)
+    return kb._get_or_create(e5_collection_name())
 
 
 def quarantine(chunk_ids: list[str], reason: str, kb=None) -> None:
@@ -185,19 +212,19 @@ class RoutedSearch:
         log_retrieval({"request_id": request_id, "user_id": user_id, "role": scope.role, "tenant_id": tenant_id,
                        "clearance": scope.clearance, "allowed_types": scope.allowed_types,
                        "intent": scope.intent, "rbac_enforced": scope.rbac_enforced, "route": r,
-                       "embedder": "e5", **query_fingerprint(query),
+                       "embedder": "e5", "e5_prefix": _style, **query_fingerprint(query),
                        "result_ids": [x.chunk_id for x in results],
                        "distances": [round(x.distance, 4) for x in results],
                        "dropped_irrelevant": [x.chunk_id for x in too_far],
                        "dropped_rescan": [x.chunk_id for x in rescan]})
-        self.last = {"route": r, "embedder": "e5"}
+        self.last = {"route": r, "embedder": "e5" if _style == "standard" else f"e5-{_style}"}
         return results
 
 
 # --------------------------------------------------------------------------- BN_native
 
 class BNNative:
-    """Nearest-attack similarity with E5, "query: " on both sides. flagged = sim > threshold."""
+    """Nearest-attack similarity with E5, the query wrapping on both sides. flagged = sim > threshold."""
 
     def __init__(self, attack_texts: list[str], threshold: float):
         if not attack_texts:
@@ -244,8 +271,13 @@ def bn_attack_texts(dev_items: str | Path | None = None, extra: str | Path | Non
 
 def load_threshold(calibration: str | Path | None, default: float | None = None, key: str = "bn_native") -> float:
     """Threshold from calibrate.py's calibration.json, or the default."""
+    if calibration and _style != "standard" and Path(calibration).name == "calibration.json":
+        calibration = Path(calibration).with_name(f"calibration_{_style}.json")   # calibrate.py's name for it
     if calibration and Path(calibration).exists():
         data = json.loads(Path(calibration).read_text(encoding="utf-8"))
+        if key == "bn_native" and data.get("e5_prefix", "standard") != _style:
+            raise SystemExit(f"{calibration} was calibrated with the {data.get('e5_prefix', 'standard')!r} E5 "
+                             f"prefix but this run uses {_style!r}; re-run calibrate.py with --e5-prefix {_style}")
         thr = data.get("chosen", {}).get(key)
         if thr is not None:
             return float(thr)

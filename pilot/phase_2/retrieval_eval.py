@@ -78,13 +78,18 @@ def summarise(rows: list[dict], k: int) -> list[dict]:
     return out
 
 
+STYLE = {"e5": "standard", "e5-tagged": "tagged"}
+
+
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--questions", default=str(DATA2_DIR / "benign_questions.jsonl"))
     ap.add_argument("--benign-dir", default=str(DATA2_DIR / "benign_docs"))
     ap.add_argument("--k", type=int, default=None, help="top-k (default: retrieval_top_k)")
     ap.add_argument("--role", default="customer")
-    ap.add_argument("--embedders", nargs="+", default=["minilm", "e5"], choices=["minilm", "e5"])
+    ap.add_argument("--embedders", nargs="+", default=["minilm", "e5"],
+                    choices=["minilm", "e5", "e5-tagged"],
+                    help="e5 = standard query:/passage: prefixes; e5-tagged = <!><query> ... <!query> style")
     ap.add_argument("--keep-kb", action="store_true", help="do not rebuild KB-4 at the end")
     ap.add_argument("--out-dir", default=str(RESULTS_DIR))
     a = ap.parse_args(argv)
@@ -107,8 +112,10 @@ def main(argv=None) -> None:
         n = plant_benign(Path(a.benign_dir), DATA_DIR) if Path(a.benign_dir).exists() else 0
         print(f"planted {n} benign documents; rebuilding KB-4 (scan on)")
         build_kb4.build(data_dir=DATA_DIR, scan=True)
-        if "e5" in a.embedders:
-            bn_route.build_e5_collection()
+        for emb in a.embedders:
+            if emb != "minilm":
+                bn_route.set_prefix_style(STYLE[emb])
+                bn_route.build_e5_collection()
         known = set(m["source_doc_id"] for m in kb.kb4_documents.get(include=["metadatas"])["metadatas"])
         for q in qs:
             gold = gold_id(q["gold_source"])
@@ -120,6 +127,7 @@ def main(argv=None) -> None:
                 if emb == "minilm":
                     coll, qe = kb.kb4_documents, kb.embed(q["question"])
                 else:
+                    bn_route.set_prefix_style(STYLE[emb])
                     coll, qe = bn_route.e5_collection(), bn_route.embed_query([q["question"]])
                 res = coll.query(query_embeddings=qe, n_results=k, where=where, include=["metadatas", "distances"])
                 sources = [m.get("source_doc_id", "") for m in res["metadatas"][0]]
@@ -128,6 +136,7 @@ def main(argv=None) -> None:
                              "rank": rank_of(sources, gold), "top_sources": ";".join(sources),
                              "top_distance": round(res["distances"][0][0], 4) if res["distances"][0] else None})
     finally:
+        bn_route.set_prefix_style("standard")
         unplant_benign(DATA_DIR)
         if not a.keep_kb:
             print("restoring KB-4 without the benign documents ...")

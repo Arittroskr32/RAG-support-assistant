@@ -218,7 +218,11 @@ def main(argv=None) -> None:
     ap.add_argument("--bn-extra", help="extra BN_native attack examples (JSONL with 'text')")
     ap.add_argument("--tag", default="")
     ap.add_argument("--out-dir", default=str(RESULTS_DIR))
+    ap.add_argument("--e5-prefix", choices=["standard", "tagged"], default="standard",
+                    help="E5 wrapping: standard = query:/passage: (default), tagged = <!><query> ... <!query>")
     a = ap.parse_args(argv)
+    from pilot.phase_2 import bn_route as _bn
+    _bn.set_prefix_style(a.e5_prefix)
 
     from config.settings import get_thresholds
     from generation import l7_generation as l7
@@ -267,7 +271,9 @@ def run_all(a, items, chosen, orch, l7, bn_route, get_thresholds) -> None:
     where = plant_dir()
     out_dir = Path(a.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    stem = f"stack2_{a.config}_{re.sub(r'[^A-Za-z0-9.]+', '-', a.model)}" + (f"_{a.tag}" if a.tag else "")
+    # tagged E5 runs are a separate configuration in the files and in the factor table
+    label = a.config + ("_tagged" if a.e5_prefix == "tagged" and a.config != "deployed" else "")
+    stem = f"stack2_{label}_{re.sub(r'[^A-Za-z0-9.]+', '-', a.model)}" + (f"_{a.tag}" if a.tag else "")
     print(f"config {a.config}, model {a.model}, ingestion scan {'off' if a.no_scan else 'on'}"
           f"{' + L3' if a.with_l3 else ''}{' + BN_native' if bn else ''}, render guard "
           f"{'on' if cfg.enable_render_guard else 'OFF'}, fast_path_ceiling {cfg.fast_path_ceiling}")
@@ -282,7 +288,7 @@ def run_all(a, items, chosen, orch, l7, bn_route, get_thresholds) -> None:
                 for run in range(1, a.runs + 1):
                     seed = a.seed_base + 2000 + run          # measurement-phase seeds
                     set_seed(seed)
-                    row = {"config": a.config, "model": a.model, "run": run, "seed": seed,
+                    row = {"config": label, "model": a.model, "run": run, "seed": seed,
                            "item_id": r["item_id"], "parent_id": r.get("parent_id") or r["item_id"],
                            "variant": r["variant"], "group": g, "seed_family": r["seed_family"],
                            "goal_type": r["goal_type"], "technique": r["technique"], "author": r.get("author", ""),
@@ -313,7 +319,7 @@ def run_all(a, items, chosen, orch, l7, bn_route, get_thresholds) -> None:
     meta = {"time": datetime.datetime.now().isoformat(timespec="seconds"), "config": a.config, "model": a.model,
             "runs": a.runs, "seed_base": a.seed_base, "temperature": a.temperature, "scan": not a.no_scan,
             "with_l3": a.with_l3, "bn_threshold": bn.threshold if bn else None, "route_all": a.route_all,
-            "e5_max_distance": a.e5_max_distance, "native_ollama": not a.openai_compat,
+            "e5_max_distance": a.e5_max_distance, "e5_prefix": a.e5_prefix, "native_ollama": not a.openai_compat,
             "thresholds": dataclasses.asdict(cfg), "git_commit": git_commit(), "items": a.items,
             "n_rows": len(rows), "csv": f"{stem}.csv"}
     with open(out_dir / "stack2_runs.jsonl", "a", encoding="utf-8") as fh:

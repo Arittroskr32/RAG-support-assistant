@@ -221,6 +221,8 @@ def main(argv=None) -> None:
     r.add_argument("--no-check", action="store_true")
     r.add_argument("--bn", action="store_true", help="add BN_native as a query-side detector")
     r.add_argument("--bn-extra")
+    r.add_argument("--e5-prefix", choices=["standard", "tagged"], default="standard",
+                    help="E5 wrapping: standard = query:/passage: (default), tagged = <!><query> ... <!query>")
     r.add_argument("--bn-threshold", type=float)
     r.add_argument("--calibration", default=str(RESULTS_DIR / "calibration.json"))
     r.add_argument("--answers", action="store_true", help="also run attacks through generation (needs Ollama)")
@@ -233,6 +235,9 @@ def main(argv=None) -> None:
     z.add_argument("--out-md", default=str(RESULTS_DIR / "rq1_correlation.md"))
     z.add_argument("--n-boot", type=int, default=2000)
     a = ap.parse_args(argv)
+    if a.cmd == "run":
+        from pilot.phase_2 import bn_route as _bn
+        _bn.set_prefix_style(a.e5_prefix)
     run(a) if a.cmd == "run" else analyze(a)
 
 

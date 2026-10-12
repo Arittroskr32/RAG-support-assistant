@@ -21,7 +21,8 @@ Detectors (the ingestion scan of ingestion/build_kb4.py, plus BN_native):
   BN_native  E5 similarity to the Bangla attack KB, flag if similarity > threshold;
              calibrated on bn + banglish benign chunks only (it only sees Bangla-routed text)
 
-Writes pilot/phase_2/results/calibration.json (read by stack_check2.py) and calibration.md.
+Writes pilot/phase_2/results/calibration.json (read by stack_check2.py) and calibration.md;
+with --e5-prefix tagged the files are calibration_tagged.json / .md instead.
 config/thresholds.yaml is NOT changed: copy the printed values yourself once agreed.
 """
 from __future__ import annotations
@@ -87,7 +88,11 @@ def main(argv=None) -> None:
     ap.add_argument("--no-bn", action="store_true", help="skip BN_native (no E5 model)")
     ap.add_argument("--bn-extra", help="extra BN_native attack examples (JSONL with 'text')")
     ap.add_argument("--out-dir", default=str(RESULTS_DIR))
+    ap.add_argument("--e5-prefix", choices=["standard", "tagged"], default="standard",
+                    help="E5 wrapping: standard = query:/passage: (default), tagged = <!><query> ... <!query>")
     a = ap.parse_args(argv)
+    from pilot.phase_2 import bn_route as _bn
+    _bn.set_prefix_style(a.e5_prefix)
 
     from config.settings import get_thresholds
     from pilot.phase_1 import layers
@@ -135,7 +140,7 @@ def main(argv=None) -> None:
     a_groups = [group_code(i) for i in attacks]
 
     targets = [a.target] + [t for t in a.target_extra if t != a.target]
-    result = {"target_fqr": a.target, "n_benign_chunks": dict(n_lang), "n_attacks": len(attacks),
+    result = {"target_fqr": a.target, "e5_prefix": a.e5_prefix, "n_benign_chunks": dict(n_lang), "n_attacks": len(attacks),
               "attacks_file": a.attacks, "current": {"L2b": cfg.narrative_match_threshold},
               "thresholds": {}, "chosen": {}, "warnings": warnings}
     md = [f"# Ingestion detector calibration (target false-quarantine rate {a.target:.0%})", "",
@@ -198,14 +203,15 @@ def main(argv=None) -> None:
     out.mkdir(parents=True, exist_ok=True)
     rows = [{"lang": c["lang"], "source": c["source"], **{k: v[i] for k, v in b_scores.items()}}
             for i, c in enumerate(benign)]
-    result["benign_scores_file"] = "calibration_benign_scores.jsonl"
-    with open(out / "calibration_benign_scores.jsonl", "w", encoding="utf-8") as fh:
+    stem = "calibration" + ("" if a.e5_prefix == "standard" else f"_{a.e5_prefix}")
+    result["benign_scores_file"] = f"{stem}_benign_scores.jsonl"
+    with open(out / f"{stem}_benign_scores.jsonl", "w", encoding="utf-8") as fh:
         for r in rows:
             fh.write(json.dumps(r, ensure_ascii=False) + "\n")
-    (out / "calibration.json").write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
-    (out / "calibration.md").write_text("\n".join(md) + "\n", encoding="utf-8")
+    (out / f"{stem}.json").write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
+    (out / f"{stem}.md").write_text("\n".join(md) + "\n", encoding="utf-8")
     print("\n".join(md))
-    print(f"\nwrote {out / 'calibration.json'} and calibration.md")
+    print(f"\nwrote {out / (stem + '.json')} and {stem}.md")
 
 
 if __name__ == "__main__":

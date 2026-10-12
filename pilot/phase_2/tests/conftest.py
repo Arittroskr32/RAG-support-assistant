@@ -22,8 +22,9 @@ class FakeE5:
     def __init__(self, dim: int = 128):
         self.dim, self.prefixes = dim, []
 
-    def encode(self, texts, prefix):
+    def encode(self, texts, prefix, suffix=""):
         self.prefixes.append(prefix)
+        self.suffixes = getattr(self, "suffixes", []) + [suffix]
         out = []
         for t in texts:
             v = [0.0] * self.dim
@@ -41,3 +42,4 @@ def fake_e5():
     bn_route.set_e5(e)
     yield e
     bn_route.set_e5(None)
+    bn_route.set_prefix_style("standard")

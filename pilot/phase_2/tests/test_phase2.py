@@ -249,6 +249,27 @@ def test_bn_native_scores_and_contamination_guard(fake_e5):
     assert bn.check(texts[0])["flagged"] and fake_e5.prefixes[-1] == "query: "
 
 
+def test_tagged_prefix_style(built_kb4, fake_e5, tmp_path):
+    from pilot.phase_2 import bn_route
+    with pytest.raises(ValueError):
+        bn_route.set_prefix_style("secret")
+    bn_route.set_prefix_style("tagged")
+    assert bn_route.e5_collection_name() == "kb4_documents_e5_tagged"
+    bn_route.build_e5_collection(built_kb4)
+    assert fake_e5.prefixes[-1] == "<!><passage> " and fake_e5.suffixes[-1] == " <!passage>"
+    bn_route.embed_query(["ডেলিভারি"])
+    assert fake_e5.prefixes[-1] == "<!><query> " and fake_e5.suffixes[-1] == " <!query>"
+    # a threshold calibrated with the other wrapping is refused; the default file name follows the style
+    (tmp_path / "calibration.json").write_text(json.dumps({"e5_prefix": "standard", "chosen": {"bn_native": 0.8}}))
+    with pytest.raises(SystemExit):
+        bn_route.load_threshold(tmp_path / "calibration.json")
+    (tmp_path / "calibration_tagged.json").write_text(json.dumps({"e5_prefix": "tagged", "chosen": {"bn_native": 0.7}}))
+    assert bn_route.load_threshold(tmp_path / "calibration.json") == 0.7
+    bn_route.set_prefix_style("standard")
+    assert bn_route.e5_collection_name() == "kb4_documents_e5"
+    assert bn_route.load_threshold(tmp_path / "calibration.json") == 0.8
+
+
 # --------------------------------------------------------------------------- defended runs
 
 def _copy_data(tmp_path):
@@ -346,9 +367,11 @@ def test_retrieval_eval(built_kb4, fake_e5, tmp_path, monkeypatch):
     monkeypatch.setattr(build_kb4, "QUARANTINE_REPORT", tmp_path / "q.jsonl")
     ex = common2.DATA2_DIR / "examples"
     retrieval_eval.main(["--questions", str(ex / "benign_questions.jsonl"), "--benign-dir",
-                         str(ex / "benign_docs"), "--out-dir", str(tmp_path)])
+                         str(ex / "benign_docs"), "--out-dir", str(tmp_path),
+                         "--embedders", "minilm", "e5", "e5-tagged"])
     rows = list(csv.DictReader(open(tmp_path / "retrieval_eval.csv", encoding="utf-8")))
-    assert {r["embedder"] for r in rows} == {"minilm", "e5"} and len(rows) == 8
+    assert {r["embedder"] for r in rows} == {"minilm", "e5", "e5-tagged"} and len(rows) == 12
+    assert "<!><query> " in fake_e5.prefixes and "<!><passage> " in fake_e5.prefixes
     assert not list((data / "public_faq").glob("zz_p2b_*"))
     assert "Recall@" in (tmp_path / "retrieval_eval.md").read_text()
 
@@ -432,3 +455,17 @@ def test_bangla_check_run_and_summarize(tmp_path, monkeypatch):
         w.writerows(rows)
     bc.main(["summarize", "--out-dir", str(tmp_path)])
     assert "| m1 | bn | 2 | 100% | 100% | 0% | 0% |" in (tmp_path / "bangla_check.md").read_text()
+
+
+def test_template_items_file():
+    """The 60-row template is structurally valid; the only hard failures are the TODO placeholders."""
+    from collections import Counter
+    from pilot.phase_2.validate_items2 import phase2_checks
+    items = common2.load_items2(common2.PHASE2_DIR / "pilot_items2.jsonl")
+    assert Counter(i["group"] for i in items) == {"english": 15, "translated": 15, "banglish": 15, "native": 15}
+    if not any("TODO" in i["payload"] for i in items):
+        return                                   # already filled in by hand: nothing template-specific to check
+    hard, _ = phase2_checks(items, common2.read_jsonl(common2.PHASE1_ITEMS))
+    assert hard and all("still has TODO" in h for h in hard)
+    for it in items:
+        assert it["payload"] in it["carrier_doc"] and it["canary_core"] in it["carrier_doc"]

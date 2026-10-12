@@ -16,7 +16,8 @@ package whose name has a hyphen, and every script here is run as `python -m pilo
 | E5 route, BN_native, retrieval eval | `sentence-transformers` and the `intfloat/multilingual-e5-small` model (downloads once, ~470 MB) |
 | L3 (`--with-l3`, `q_L3`) | the Llama-Guard backend the main pipeline uses (GPU) |
 
-Run everything from the repository root.
+Run everything from the repository root. **`run.md` is the full A-to-Z run order**; this file
+explains what each script does.
 
 ## Check the code works (no GPU, no Ollama)
 
@@ -24,7 +25,7 @@ Run everything from the repository root.
 python -m pytest -q pilot/phase_2/tests
 ```
 
-24 tests cover every script with the repository's fake KB, fake guardrail, fake LLM and a fake E5
+26 tests cover every script with the repository's fake KB, fake guardrail, fake LLM and a fake E5
 embedder: seeds and the think switch are sent, controls are built without leftover payload
 fragments, stack configs restore everything they patch, calibration picks thresholds at the
 target rate, the statistics match hand-computed values, and refusal padding works.
@@ -42,7 +43,9 @@ Same fields as phase 1 (see `pilot/phase_1/DATASET.md`) plus:
 | `entity_sentence` | phish items | a neutral sentence that keeps the address/URL (with the canary core) for the base-rate control |
 | `reviewer`, `review_status` | recommended | `review_status: "approved"` once checked |
 
-Four example rows are in `pilot_items2.example.jsonl`. Check your file before running anything:
+`pilot_items2.jsonl` starts as a 60-row template (15 per group) with every fixed field set and
+`TODO` in the text fields; the validator fails until every `TODO` is replaced. Four filled-in
+example rows are in `pilot_items2.example.jsonl`. Check your file before running anything:
 
 ```bash
 python -m pilot.phase_2.validate_items2                      # reads pilot/phase_2/pilot_items2.jsonl
@@ -50,7 +53,7 @@ python -m pilot.phase_2.validate_items2 --items pilot/phase_2/pilot_items2.examp
 ```
 
 Hard failures (exit code 1): any phase-1 check, `split` not `test`, a reused family/core/payload,
-an unknown `author`. Warnings: not approved, fewer than 12 items in a group, phish without
+an unknown `author`, a `TODO` left in a text field. Warnings: not approved, fewer than 12 items in a group, phish without
 `entity_sentence`, no `user_request`, fewer human than AI-made Banglish items.
 
 ## Order of work
@@ -123,6 +126,9 @@ The E5 route: questions in Bangla script, or with two or more Banglish function 
 embedded with multilingual-E5 (`query: ` prefix) and searched in a copy of KB-4
 (`kb4_documents_e5`, chunks embedded with `passage: `). The same role filter (`build_where`) is
 used, so RBAC does not change. English questions keep the deployed MiniLM index.
+`--e5-prefix tagged` wraps texts as `<!><query> ... <!query>` / `<!><passage> ... <!passage>`
+instead, with its own E5 collection and calibration file; `retrieval_eval --embedders minilm e5
+e5-tagged` compares the two styles.
 
 BN_native compares each Bangla/Banglish chunk with the Bangla attack examples (the non-English
 phase-1 payloads only; test payloads are refused) and quarantines it above the threshold.

@@ -9,6 +9,8 @@ elsewhere in data/, pii phone, family alignment, ...) and then the phase-2 rules
   hard  * split is "test" on every item (the 56 phase-1 items are the dev set)
         * no seed_family, canary core or payload shared with a phase-1 (dev) item
         * author is one of: human, ai-draft+human-edit, translated-ai+reviewed, translated-human
+        * no TODO left in payload, carrier_doc, question, user_request or entity_sentence
+          (the template pilot_items2.jsonl starts with TODO everywhere)
   warn  * review_status is not "approved"
         * fewer than 12 items in a group (DATASET.md floor)
         * phish item without entity_sentence (C2 then uses a draft)
@@ -40,6 +42,10 @@ def phase2_checks(items: list[dict], dev: list[dict]) -> tuple[list[str], list[s
             hard.append(f"{tag}: canary core {it['canary_core']} is already used by a phase-1 item")
         if it.get("payload", "").strip() in dev_payloads:
             hard.append(f"{tag}: payload is copied from a phase-1 item")
+        todo = [f for f in ("payload", "carrier_doc", "question", "user_request", "entity_sentence")
+                if "TODO" in str(it.get(f, ""))]
+        if todo:
+            hard.append(f"{tag}: still has TODO in {', '.join(todo)}")
         if it.get("author") not in AUTHORS:
             hard.append(f"{tag}: author must be one of {sorted(AUTHORS)}, got {it.get('author')!r}")
         if it.get("review_status") != "approved":
