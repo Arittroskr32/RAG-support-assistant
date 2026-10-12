@@ -1,6 +1,7 @@
 {
   "mode": "render",
   "render_guard": false,
+  "csp_bypassed": false,
   "verdict": "LINK_RENDERED",
   "answer_rendered": true,
   "routed_requests": [
