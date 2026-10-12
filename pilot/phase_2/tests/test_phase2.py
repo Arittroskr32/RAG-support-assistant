@@ -469,3 +469,67 @@ def test_template_items_file():
     assert hard and all("still has TODO" in h for h in hard)
     for it in items:
         assert it["payload"] in it["carrier_doc"] and it["canary_core"] in it["carrier_doc"]
+
+
+# --------------------------------------------------------------------------- <!><query> / <!><passage> wrappers
+
+def test_tags_wrap_unwrap_and_problems():
+    from pilot.phase_2 import tags
+    q = tags.wrap("ঢাকার বাইরে ডেলিভারি কতদিন?", "query")
+    assert q == "<!><query> ঢাকার বাইরে ডেলিভারি কতদিন? <!query>"
+    assert tags.unwrap(q, "query") == "ঢাকার বাইরে ডেলিভারি কতদিন?"
+    d = tags.wrap("## Delivery\n3-5 days.\n", "passage")
+    assert d.startswith("<!><passage>\n") and tags.unwrap(d, "passage") == "## Delivery\n3-5 days."
+    assert tags.unwrap("plain text", "query") == "plain text"
+    assert tags.problems(q, "query") == [] and tags.problems("plain", "query") == []
+    assert tags.problems("<!><query> no end", "query")
+    assert tags.problems(q, "passage")                                    # wrong kind of wrapper
+    assert tags.problems("<!><query> a <!passage> b <!query>", "query")   # marker inside
+    assert tags.strip_markers("a < ! > < QUERY > b <!passage> c") == "a  b  c"
+
+
+def test_load_items2_separates_wrappers_and_validator_checks_them(tmp_path):
+    from pilot.phase_2 import tags
+    from pilot.phase_2.validate_items2 import tag_checks
+    raw = common2.read_jsonl(common2.PHASE2_DIR / "pilot_items2.example.jsonl")
+    assert all(tags.is_wrapped(r["question"], "query") and tags.is_wrapped(r["carrier_doc"], "passage") for r in raw)
+    items = common2.load_items2(common2.PHASE2_DIR / "pilot_items2.example.jsonl")
+    for it in items:
+        assert not tags.MARKER.search(it["question"] + it["carrier_doc"])
+        assert it["payload"] in it["carrier_doc"] and it["tagged"] == {"question": True, "carrier_doc": True}
+    # the prompt the LLM gets has no wrapper
+    system, user, _ = common2.build_prompt(items[0], "real")
+    assert not tags.MARKER.search(system + user)
+    assert tag_checks(raw) == ([], [])
+    bad = [dict(raw[0], question="<!><query> no closing marker"), dict(raw[1], payload="x <!passage> y")]
+    hard, _ = tag_checks(bad + raw[2:])
+    assert len(hard) == 2
+    # wrapped and unwrapped rows mixed -> warning
+    _, soft = tag_checks([dict(raw[0], question="plain question?")] + raw[1:])
+    assert any("wrap all or none" in s for s in soft)
+
+
+def test_routed_search_unwraps_query_and_strips_chunks(built_kb4, fake_e5):
+    import dataclasses
+    from config.settings import get_thresholds
+    from pilot.phase_2 import bn_route
+    from retrieval.l4_query_rewriter import resolve_scope
+    from retrieval.l5_secure_retrieval import RetrievedChunk
+    kb = built_kb4
+    kb.kb4_documents.add(ids=["bnw"], documents=["<!><passage> ডেলিভারি ঢাকার বাইরে ৩-৫ দিন <!passage>"],
+                         embeddings=kb.embed(["a"]),
+                         metadatas=[{"quarantined": False, "clearance_level": 0, "document_type": "public_faq",
+                                     "tenant_id": "default", "source_doc_id": "public_faq/bnw.md", "title": "t"}])
+    bn_route.set_prefix_style("tagged")
+    bn_route.build_e5_collection(kb)
+    assert fake_e5.prefixes[-1] == "<!><passage> "
+    cfg = dataclasses.replace(get_thresholds(), retrieval_top_k=50)
+    q = "<!><query> ডেলিভারি ঢাকার বাইরে কতদিন? <!query>"
+    search = bn_route.RoutedSearch(lambda *a, **k: [], max_distance=2.0)
+    res = search([0.0], resolve_scope(q, "customer", cfg), "default", cfg, query=q)
+    assert search.last["route"] == "bn"                                  # routed on the unwrapped text
+    assert res and all(not bn_route.tags.MARKER.search(r.text) for r in res)
+    # the English (MiniLM) path also hands the LLM clean chunks
+    en = bn_route.RoutedSearch(lambda *a, **k: [RetrievedChunk("c", "<!><passage> hi <!passage>", {}, 0.1)])
+    out = en([0.0], resolve_scope("hi", "customer", cfg), "default", cfg, query="<!><query> Where is my order? <!query>")
+    assert out[0].text.strip() == "hi"

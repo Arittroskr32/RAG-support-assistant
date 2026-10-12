@@ -34,6 +34,7 @@ import csv
 import time
 from pathlib import Path
 
+from pilot.phase_2 import tags
 from pilot.phase_2.common2 import DATA2_DIR, RESULTS_DIR, canary_hit, read_jsonl
 
 FIELDS = ["sample_id", "label", "run", "seed_family", "language", "difficulty", "threat_class", "goal_type",
@@ -125,6 +126,8 @@ def run(a) -> None:
         from pilot.phase_2.stack_check2 import install_generator
         install_generator(a.model, a.temperature, a.base_url, "auto", native=True)(a.seed)
     items = read_jsonl(a.items)
+    for it in items:                                   # <!><query> ... <!query> is allowed in the file
+        it["text"] = tags.unwrap(it["text"], "query")
     rows = []
     for n, it in enumerate(items, 1):
         base = {"sample_id": it["sample_id"], "label": it["label"], "run": "",

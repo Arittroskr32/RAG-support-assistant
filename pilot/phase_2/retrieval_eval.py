@@ -26,6 +26,7 @@ import shutil
 from collections import defaultdict
 from pathlib import Path
 
+from pilot.phase_2 import tags
 from pilot.phase_2.common2 import DATA2_DIR, RESULTS_DIR, read_jsonl
 
 PLANT_PREFIX = "zz_p2b_"
@@ -46,7 +47,8 @@ def plant_benign(benign_dir: Path, data_dir: Path) -> int:
     for lang_dir in sorted(p for p in benign_dir.glob("*") if p.is_dir()):
         for f in sorted(lang_dir.glob("*")):
             if f.suffix.lower() in (".md", ".txt"):
-                shutil.copy(f, data_dir / planted_name(f"benign_docs/{lang_dir.name}/{f.name}"))
+                text = tags.unwrap(f.read_text(encoding="utf-8"), "passage")      # planted as plain text
+                (data_dir / planted_name(f"benign_docs/{lang_dir.name}/{f.name}")).write_text(text, encoding="utf-8")
                 n += 1
     return n
 
@@ -104,6 +106,8 @@ def main(argv=None) -> None:
     cfg = get_thresholds()
     k = a.k or cfg.retrieval_top_k
     qs = read_jsonl(a.questions)
+    for q in qs:
+        q["question"] = tags.unwrap(q["question"], "query")
     if not qs:
         raise SystemExit(f"no questions in {a.questions}")
     rows = []

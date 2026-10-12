@@ -32,6 +32,7 @@ from pilot.phase_1.common import (DISTRACTOR, FALLBACK_MATCHER, GenerationError,
                                   require_real_matcher)
 from pilot.phase_1.common import build_messages as stand_in_messages  # noqa: E402
 from pilot.phase_1.common import generate as phase1_generate  # noqa: E402
+from pilot.phase_2 import tags  # noqa: E402
 
 RESULTS_DIR = PHASE2_DIR / "results"
 DATA2_DIR = PHASE2_DIR / "data"
@@ -66,13 +67,19 @@ def write_jsonl(path: str | Path, rows: list[dict]) -> None:
 def load_items2(path: str | Path) -> list[dict]:
     """Load attack items and/or control variants.
 
-    Every row needs the phase-1 fields. `variant` defaults to "attack". Item ids must be
+    `question` may be wrapped as <!><query> ... <!query> and `carrier_doc` as
+    <!><passage> ... <!passage> (see tags.py); the wrappers are removed here, so callers always
+    get plain text, and `tagged` records which fields had them. Every row needs the phase-1 fields. `variant` defaults to "attack". Item ids must be
     unique; canary cores must be unique among attacks (a control shares its parent's core)."""
     items = []
     for n, it in enumerate(read_jsonl(path), 1):
         missing = [k for k in REQUIRED if k not in it]
         if missing:
             raise ValueError(f"{path} line {n} ({it.get('item_id')}): missing {missing}")
+        it["tagged"] = {"question": tags.is_wrapped(it["question"], "query"),
+                        "carrier_doc": tags.is_wrapped(it["carrier_doc"], "passage")}
+        it["question"] = tags.unwrap(it["question"], "query")
+        it["carrier_doc"] = tags.unwrap(it["carrier_doc"], "passage")
         it.setdefault("variant", "attack")
         if it["variant"] not in VARIANTS:
             raise ValueError(f"{it['item_id']}: unknown variant {it['variant']!r}")

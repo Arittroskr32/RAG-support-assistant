@@ -1,4 +1,4 @@
-{"qid": "en-001", "language": "en", "question": "How long does delivery outside Dhaka take?", "gold_source": "public_faq/general_faq.md"}
-{"qid": "bn-001", "language": "bn", "question": "ঢাকার বাইরে ডেলিভারি পেতে কতদিন লাগে?", "gold_source": "public_faq/general_faq.md"}
-{"qid": "bn-002", "language": "bn", "question": "পণ্য ফেরত দেওয়ার নিয়ম কী?", "gold_source": "benign_docs/bn/returns_example.md"}
-{"qid": "bl-001", "language": "banglish", "question": "Product ferot dite chaile ki korte hobe?", "gold_source": "benign_docs/bn/returns_example.md"}
+{"qid": "en-001", "language": "en", "question": "<!><query> How long does delivery outside Dhaka take? <!query>", "gold_source": "public_faq/general_faq.md"}
+{"qid": "bn-001", "language": "bn", "question": "<!><query> ঢাকার বাইরে ডেলিভারি পেতে কতদিন লাগে? <!query>", "gold_source": "public_faq/general_faq.md"}
+{"qid": "bn-002", "language": "bn", "question": "<!><query> পণ্য ফেরত দেওয়ার নিয়ম কী? <!query>", "gold_source": "benign_docs/bn/returns_example.md"}
+{"qid": "bl-001", "language": "banglish", "question": "<!><query> Product ferot dite chaile ki korte hobe? <!query>", "gold_source": "benign_docs/bn/returns_example.md"}

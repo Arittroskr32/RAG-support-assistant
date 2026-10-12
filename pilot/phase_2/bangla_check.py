@@ -25,6 +25,7 @@ import csv
 import re
 from pathlib import Path
 
+from pilot.phase_2 import tags
 from pilot.phase_2.common2 import (DATA2_DIR, RESULTS_DIR, ROOT, build_prompt, generate2, postprocess,
                                    read_jsonl, wants_think_off)
 
@@ -33,7 +34,7 @@ REVIEW = ["correct", "same_language", "natural", "notes"]
 
 def gold_text(gold: str, benign_dir: Path) -> str:
     p = benign_dir.parent / gold if gold.startswith("benign_docs/") else ROOT / "data" / gold
-    return p.read_text(encoding="utf-8")
+    return tags.unwrap(p.read_text(encoding="utf-8"), "passage")
 
 
 def slug(model: str) -> str:
@@ -41,7 +42,8 @@ def slug(model: str) -> str:
 
 
 def run(a) -> None:
-    qs = [q for q in read_jsonl(a.questions) if q["language"] in a.languages]
+    qs = [{**q, "question": tags.unwrap(q["question"], "query")}
+          for q in read_jsonl(a.questions) if q["language"] in a.languages]
     if not qs:
         raise SystemExit(f"no {a.languages} questions in {a.questions}")
     for model in a.models:

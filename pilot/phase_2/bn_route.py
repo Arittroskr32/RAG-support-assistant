@@ -29,6 +29,8 @@ import re
 import threading
 from pathlib import Path
 
+from pilot.phase_2 import tags
+
 E5_MODEL = "intfloat/multilingual-e5-small"
 E5_COLLECTION = "kb4_documents_e5"
 # How a text is wrapped before E5 embeds it. "standard" is what E5 was trained with and the
@@ -38,7 +40,8 @@ E5_COLLECTION = "kb4_documents_e5"
 # changes the embedding; it is not a trust boundary (the random L6 nonce tags are).
 PREFIX_STYLES = {
     "standard": {"query": ("query: ", ""), "passage": ("passage: ", "")},
-    "tagged": {"query": ("<!><query> ", " <!query>"), "passage": ("<!><passage> ", " <!passage>")},
+    "tagged": {"query": (tags.OPEN["query"] + " ", " " + tags.CLOSE["query"]),
+               "passage": (tags.OPEN["passage"] + " ", " " + tags.CLOSE["passage"])},
 }
 _style = "standard"
 
@@ -126,11 +129,12 @@ def set_e5(instance) -> None:
 
 
 def embed_query(texts: list[str]) -> list[list[float]]:
-    return get_e5().encode(texts, *PREFIX_STYLES[_style]["query"])
+    """Any wrapper already on the text is removed first, so it is wrapped exactly once."""
+    return get_e5().encode([tags.unwrap(t, "query") for t in texts], *PREFIX_STYLES[_style]["query"])
 
 
 def embed_passage(texts: list[str]) -> list[list[float]]:
-    return get_e5().encode(texts, *PREFIX_STYLES[_style]["passage"])
+    return get_e5().encode([tags.unwrap(t, "passage") for t in texts], *PREFIX_STYLES[_style]["passage"])
 
 
 # --------------------------------------------------------------------------- E5 collection
@@ -188,11 +192,15 @@ class RoutedSearch:
         from security import l2_pattern_filter
         from security.event_log import log_retrieval, query_fingerprint
 
+        query = tags.unwrap(query, "query")
         r = route(query)
         if r == "en" and not self.route_all:
             self.last = {"route": "en", "embedder": "minilm"}
-            return self.original(query_emb, scope, tenant_id, cfg, user_id=user_id,
-                                 request_id=request_id, query=query)
+            results = self.original(query_emb, scope, tenant_id, cfg, user_id=user_id,
+                                    request_id=request_id, query=query)
+            for x in results:                 # the LLM never sees a wrapper marker
+                x.text = tags.strip_markers(x.text)
+            return results
         cfg = cfg or get_thresholds()
         coll = e5_collection()
         results = []
@@ -201,7 +209,7 @@ class RoutedSearch:
                              where=build_where(scope, tenant_id), include=["documents", "metadatas", "distances"])
             for cid, doc, meta, dist in zip(res["ids"][0], res["documents"][0], res["metadatas"][0],
                                             res["distances"][0]):
-                results.append(RetrievedChunk(cid, doc, meta, dist))
+                results.append(RetrievedChunk(cid, tags.strip_markers(doc), meta, dist))
         limit = self.max_distance if self.max_distance is not None else cfg.retrieval_max_distance
         too_far = [x for x in results if x.distance > limit]
         results = [x for x in results if x.distance <= limit]

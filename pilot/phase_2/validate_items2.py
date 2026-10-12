@@ -9,9 +9,13 @@ elsewhere in data/, pii phone, family alignment, ...) and then the phase-2 rules
   hard  * split is "test" on every item (the 56 phase-1 items are the dev set)
         * no seed_family, canary core or payload shared with a phase-1 (dev) item
         * author is one of: human, ai-draft+human-edit, translated-ai+reviewed, translated-human
+        * <!><query> ... <!query> / <!><passage> ... <!passage> wrappers well formed: one pair at
+          the very start and end of question / carrier_doc, none inside payload, user_request or
+          entity_sentence
         * no TODO left in payload, carrier_doc, question, user_request or entity_sentence
           (the template pilot_items2.jsonl starts with TODO everywhere)
-  warn  * review_status is not "approved"
+  warn  * some items wrapped and some not
+        * review_status is not "approved"
         * fewer than 12 items in a group (DATASET.md floor)
         * phish item without entity_sentence (C2 then uses a draft)
         * item without user_request (C1 then uses the payload as a draft)
@@ -24,7 +28,28 @@ import argparse
 import sys
 from collections import Counter
 
+from pilot.phase_2 import tags
 from pilot.phase_2.common2 import AUTHORS, PHASE1_ITEMS, load_items2, read_jsonl
+
+
+def tag_checks(raw: list[dict]) -> tuple[list[str], list[str]]:
+    """Wrapper format, checked on the rows as written in the file (before load_items2 unwraps)."""
+    hard, soft = [], []
+    for r in raw:
+        if r.get("variant", "attack") != "attack":
+            continue
+        tag = r.get("item_id")
+        for field, kind in (("question", "query"), ("carrier_doc", "passage")):
+            hard += [f"{tag}: {field} {p}" for p in tags.problems(r.get(field, ""), kind)]
+        for field in ("payload", "user_request", "entity_sentence"):
+            if tags.MARKER.search(str(r.get(field) or "")):
+                hard.append(f"{tag}: {field} must not contain a wrapper marker")
+    attacks = [r for r in raw if r.get("variant", "attack") == "attack"]
+    for field, kind in (("question", "query"), ("carrier_doc", "passage")):
+        n = sum(tags.is_wrapped(r.get(field, ""), kind) for r in attacks)
+        if 0 < n < len(attacks):
+            soft.append(f"{n}/{len(attacks)} items have a wrapped {field}; wrap all or none")
+    return hard, soft
 
 
 def phase2_checks(items: list[dict], dev: list[dict]) -> tuple[list[str], list[str]]:
@@ -89,6 +114,8 @@ def main(argv=None) -> None:
         sys.exit(1)
     dev = read_jsonl(a.dev) if a.dev else []
     hard, soft = phase2_checks(items, dev)
+    th, ts = tag_checks(read_jsonl(a.items))
+    hard, soft = th + hard, ts + soft
     print("\n== phase-2 checks")
     print("authors :", dict(Counter(i.get("author") for i in items)))
     print("groups  :", dict(Counter(i["group"] for i in items)))
