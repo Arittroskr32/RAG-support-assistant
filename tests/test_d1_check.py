@@ -1,5 +1,5 @@
 """The D1 server-mode check reproduces the result before and after the render guard (D-22)."""
-from pilot.d1 import d1_check
+from pilot.phase_1.d1 import d1_check
 
 
 def test_d1_server_check_before_and_after_render_guard():

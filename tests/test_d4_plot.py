@@ -9,7 +9,7 @@ from pipeline.orchestrator import handle_request
 
 pytest.importorskip("matplotlib")
 pytest.importorskip("pandas")
-from pilot.d4 import d4_plot  # noqa: E402
+from pilot.phase_1.d4 import d4_plot  # noqa: E402
 
 CFG = dataclasses.replace(SecurityThresholds(), enable_l2b=False, enable_kb2_match=False,
                           retrieval_max_distance=0.95)

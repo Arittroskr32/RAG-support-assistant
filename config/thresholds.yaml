@@ -33,3 +33,4 @@ retrieval_top_k: 6
 retrieval_max_distance: 0.85
 max_query_chars: 4000
 expose_block_layer: false
+refusal_min_latency_ms: 0

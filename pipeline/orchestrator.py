@@ -91,6 +91,18 @@ def _guarded(layer: str, fn, *args, **kwargs):
         raise _Blocked(f"{layer}-error", error=f"{type(e).__name__}: {e}")
 
 
+def _pad_refusal(cfg, t_start: float, details: dict) -> None:
+    """D-25: hold a refusal until refusal_min_latency_ms has passed since the request began,
+    so the response time no longer tells which layer refused. Off when the value is 0."""
+    min_ms = getattr(cfg, "refusal_min_latency_ms", 0) or 0
+    if min_ms <= 0:
+        return
+    wait = min_ms / 1000 - (time.perf_counter() - t_start)
+    if wait > 0:
+        time.sleep(wait)
+        details["refusal_padded_ms"] = round(wait * 1000, 1)
+
+
 def handle_request(query: str, user_id: str, role: str, ip: str, session_id: str, tenant_id: str = "default",
                    cfg=None, generation_mode: str = "llm", request_id: str | None = None,
                    log: bool = True) -> PipelineResult:
@@ -215,6 +227,7 @@ def handle_request(query: str, user_id: str, role: str, ip: str, session_id: str
         result.verdict = "error" if b.layer.endswith("-error") else "blocked"
         result.sources, result.citations = [], {}
         details.update(b.details)
+        _pad_refusal(cfg, t_start, details)
         return result
 
     finally:

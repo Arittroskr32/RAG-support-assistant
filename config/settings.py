@@ -89,6 +89,10 @@ class SecurityThresholds:
     # --- API / response behaviour
     max_query_chars: int = 4000
     expose_block_layer: bool = False           # True only for debugging/eval — tells a caller which layer blocked them
+    # D-25 (threat row 9): every refusal returns no sooner than this, so response time does not
+    # reveal which layer refused. 0 = off (latency measurements). Pick the value with
+    # pilot/phase_2/d4_refused.py: above the slowest refusal you cannot explain away.
+    refusal_min_latency_ms: int = 0
 
 
 @dataclass(frozen=True)
