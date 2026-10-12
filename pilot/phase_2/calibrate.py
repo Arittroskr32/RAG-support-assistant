@@ -33,6 +33,7 @@ import math
 from collections import defaultdict
 from pathlib import Path
 
+from pilot.phase_2 import tags
 from pilot.phase_2.common2 import DATA2_DIR, PHASE1_ITEMS, RESULTS_DIR, ROOT, group_code, load_items2
 
 LANGS = ("en", "bn", "banglish")
@@ -45,7 +46,7 @@ def load_benign(benign_dir: Path, include_repo_data: bool) -> list[dict]:
     for lang in LANGS:
         for p in sorted((benign_dir / lang).glob("*")):
             if p.suffix.lower() in (".md", ".txt"):
-                docs.append((lang, f"{lang}/{p.name}", p.read_text(encoding="utf-8")))
+                docs.append((lang, f"{lang}/{p.name}", tags.unwrap(p.read_text(encoding="utf-8"), "passage")))
     if include_repo_data:
         from ingestion.loaders import load_documents
         for d in load_documents(ROOT / "data"):

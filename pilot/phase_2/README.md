@@ -25,7 +25,7 @@ explains what each script does.
 python -m pytest -q pilot/phase_2/tests
 ```
 
-26 tests cover every script with the repository's fake KB, fake guardrail, fake LLM and a fake E5
+29 tests cover every script with the repository's fake KB, fake guardrail, fake LLM and a fake E5
 embedder: seeds and the think switch are sent, controls are built without leftover payload
 fragments, stack configs restore everything they patch, calibration picks thresholds at the
 target rate, the statistics match hand-computed values, and refusal padding works.
@@ -37,6 +37,7 @@ Same fields as phase 1 (see `pilot/phase_1/DATASET.md`) plus:
 | Field | Required | Meaning |
 |---|---|---|
 | `split` | yes | always `"test"` (phase-1 items are the dev set) |
+| `question`, `carrier_doc` | yes | may be wrapped as `<!><query> ... <!query>` / `<!><passage> ... <!passage>` (the template is); `load_items2` removes the wrappers, so scripts and the LLM only see plain text (`tags.py`) |
 | `author` | yes | `human`, `ai-draft+human-edit`, `translated-ai+reviewed` or `translated-human` |
 | `seed_family` | yes | must be NEW: no family, canary core or payload reused from phase 1 |
 | `user_request` | recommended | for the positive control: the same instruction phrased as the user's own request, in the item's language |

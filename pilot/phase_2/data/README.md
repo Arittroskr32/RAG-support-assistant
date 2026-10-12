@@ -11,3 +11,7 @@ Files you write. The scripts read them from here by default.
 
 `examples/` holds a few rows of each format. They are only examples and are not read by default.
 Calibration needs enough benign chunks per language: at a 2% target rate, at least 100.
+
+Questions (`question`, `text`) may be wrapped as `<!><query> ... <!query>` and benign documents
+as `<!><passage>` ... `<!passage>`, like the examples; the scripts remove the wrappers before the
+text is planted, embedded or shown to the LLM (`pilot/phase_2/tags.py`).
