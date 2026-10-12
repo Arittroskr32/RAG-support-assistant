@@ -1,4 +1,4 @@
-"""pilot/stack_check.py plants items one group at a time, scores them and cleans up."""
+"""pilot/phase_1/stack_check.py plants items one group at a time, scores them and cleans up."""
 import json
 import shutil
 from pathlib import Path
@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 pytest.importorskip("pandas")
-from pilot import stack_check  # noqa: E402
+from pilot.phase_1 import stack_check  # noqa: E402
 
 DOC = "## Delivery times\nOutside Dhaka delivery takes 3-5 working days.\n"
 ITEMS = [
