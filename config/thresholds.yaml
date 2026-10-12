@@ -5,7 +5,7 @@ l3_kb_match_threshold: 0.26
 narrative_match_threshold: 0.42
 kb5_pii_threshold: 0.2
 risk_distance_scale: 0.65
-fast_path_ceiling: 0.5
+fast_path_ceiling: -1.0
 l1_block_threshold: 0.55
 enable_l1_block: false
 rate_limit_window_s: 60
