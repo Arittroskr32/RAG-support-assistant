@@ -9,7 +9,12 @@ import pytest
 from pilot.phase_2 import common2
 
 ROOT = common2.ROOT
-EXAMPLE = common2.PHASE2_DIR / "pilot_items2.example.jsonl"
+# Fixed copies of the shipped example/template files. The real files in pilot/phase_2/ are
+# yours to edit, so the tests never read them.
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
+EXAMPLE = FIXTURES / "items_example.jsonl"
+TEMPLATE = FIXTURES / "items_template.jsonl"
+DATA_EXAMPLES = FIXTURES / "data_examples"
 DOC = "## Delivery times\nOutside Dhaka delivery takes 3-5 working days.\n"
 
 
@@ -365,7 +370,7 @@ def test_retrieval_eval(built_kb4, fake_e5, tmp_path, monkeypatch):
     data = _copy_data(tmp_path)
     monkeypatch.setattr(settings, "DATA_DIR", data)
     monkeypatch.setattr(build_kb4, "QUARANTINE_REPORT", tmp_path / "q.jsonl")
-    ex = common2.DATA2_DIR / "examples"
+    ex = DATA_EXAMPLES
     retrieval_eval.main(["--questions", str(ex / "benign_questions.jsonl"), "--benign-dir",
                          str(ex / "benign_docs"), "--out-dir", str(tmp_path),
                          "--embedders", "minilm", "e5", "e5-tagged"])
@@ -441,7 +446,7 @@ def test_refusal_padding(fake_kb, monkeypatch):
 def test_bangla_check_run_and_summarize(tmp_path, monkeypatch):
     from pilot.phase_2 import bangla_check as bc
     monkeypatch.setattr(bc, "generate2", lambda *a, **k: {"text": "৭ দিনের মধ্যে", "latency_s": 1.0})
-    ex = common2.DATA2_DIR / "examples"
+    ex = DATA_EXAMPLES
     bc.main(["run", "--models", "m1", "--questions", str(ex / "benign_questions.jsonl"),
              "--benign-dir", str(ex / "benign_docs"), "--out-dir", str(tmp_path)])
     sheet = tmp_path / "bangla_check_m1.csv"
@@ -461,10 +466,8 @@ def test_template_items_file():
     """The 60-row template is structurally valid; the only hard failures are the TODO placeholders."""
     from collections import Counter
     from pilot.phase_2.validate_items2 import phase2_checks
-    items = common2.load_items2(common2.PHASE2_DIR / "pilot_items2.jsonl")
+    items = common2.load_items2(TEMPLATE)
     assert Counter(i["group"] for i in items) == {"english": 15, "translated": 15, "banglish": 15, "native": 15}
-    if not any("TODO" in i["payload"] for i in items):
-        return                                   # already filled in by hand: nothing template-specific to check
     hard, _ = phase2_checks(items, common2.read_jsonl(common2.PHASE1_ITEMS))
     assert hard and all("still has TODO" in h for h in hard)
     for it in items:
@@ -491,9 +494,9 @@ def test_tags_wrap_unwrap_and_problems():
 def test_load_items2_separates_wrappers_and_validator_checks_them(tmp_path):
     from pilot.phase_2 import tags
     from pilot.phase_2.validate_items2 import tag_checks
-    raw = common2.read_jsonl(common2.PHASE2_DIR / "pilot_items2.example.jsonl")
+    raw = common2.read_jsonl(EXAMPLE)
     assert all(tags.is_wrapped(r["question"], "query") and tags.is_wrapped(r["carrier_doc"], "passage") for r in raw)
-    items = common2.load_items2(common2.PHASE2_DIR / "pilot_items2.example.jsonl")
+    items = common2.load_items2(EXAMPLE)
     for it in items:
         assert not tags.MARKER.search(it["question"] + it["carrier_doc"])
         assert it["payload"] in it["carrier_doc"] and it["tagged"] == {"question": True, "carrier_doc": True}
