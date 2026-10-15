@@ -34,6 +34,7 @@ python -m venv .venv && source .venv/bin/activate        # Windows: .venv\Script
 pip install -r requirements.txt
 
 ollama serve                                              # its own terminal; keep it running
+# "bind: address already in use" means Ollama is already running (desktop app or service): fine, go on
 ollama pull llama3.2:3b
 ollama pull llama3.1:8b
 ollama pull qwen3:4b
@@ -45,6 +46,9 @@ python -m pytest -q pilot/phase_2/tests                   # expect: 29 passed
 ```
 
 If the tests do not all pass, stop and send the output; nothing below will be trustworthy.
+The tests use their own copies of the example files (`pilot/phase_2/tests/fixtures/`), so
+editing `pilot_items2.jsonl` or the data files never makes them fail; use the validator in
+step 4 to check your own data.
 
 ---
 
