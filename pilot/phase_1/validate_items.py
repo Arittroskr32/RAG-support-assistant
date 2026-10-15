@@ -7,7 +7,8 @@ Reports (not just pass/fail):
   * structural errors from load_items (missing fields, duplicate id/core);
   * rows still containing TODO;
   * the canary core NOT present in its own carrier_doc (so it cannot be leaked);
-  * the core appearing elsewhere in data/ (grep), which would cause false hits;
+  * the core appearing elsewhere in data/ (security_datasets/ and planted zz_* files are
+    skipped because they never reach the model), which would cause false hits;
   * payload text not found inside carrier_doc (payload must be embedded);
   * EN/TR/BL family alignment (same goal across the three languages);
   * goal / technique / split / review_status counts, and author breakdown;
@@ -25,7 +26,6 @@ from __future__ import annotations
 
 import argparse
 import re
-import subprocess
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -39,18 +39,38 @@ BN_DIGITS = str.maketrans("০১২৩৪৫৬৭৮৯", "0123456789")
 TO_BN = str.maketrans("0123456789", "০১২৩৪৫৬৭৮৯")
 
 
-def grep_data(core: str, data_dir: str) -> int:
-    """Files under data_dir containing the core in ASCII or Bangla digits."""
-    if not Path(data_dir).exists():
-        return -1
-    files = set()
-    for form in {core, core.translate(TO_BN)}:
+# Only folders the knowledge base reads can cause a false hit: security_datasets/ (KB-2/KB-6
+# training data, ingestion.loaders.EXCLUDED_DIRS) never reaches the model's context, and zz_*
+# files are documents planted by the stack checks themselves.
+SKIP_DIRS = {"security_datasets"}
+SKIP_PREFIX = "zz_"
+
+
+def grep_files(core: str, data_dir: str) -> list[str] | None:
+    """Text files under data_dir (KB-4 content only) containing the core in ASCII or Bangla
+    digits. Pure Python, so it also works on Windows."""
+    root = Path(data_dir)
+    if not root.exists():
+        return None
+    hits = []
+    for p in sorted(root.rglob("*")):
+        rel = p.relative_to(root)
+        if not p.is_file() or SKIP_DIRS & set(rel.parts[:-1]) or p.name.startswith(SKIP_PREFIX):
+            continue
         try:
-            out = subprocess.run(["grep", "-rIl", form, data_dir], capture_output=True, text=True)
-        except Exception:
-            return -1
-        files |= {l for l in out.stdout.splitlines() if l}
-    return len(files)
+            raw = p.read_bytes()
+        except OSError:
+            continue
+        if b"\0" in raw[:8192]:                      # binary, like grep -I
+            continue
+        if core in raw.decode("utf-8", errors="ignore").translate(BN_DIGITS):
+            hits.append(str(p))
+    return hits
+
+
+def grep_data(core: str, data_dir: str) -> int:
+    files = grep_files(core, data_dir)
+    return -1 if files is None else len(files)
 
 
 def main(argv=None) -> None:
@@ -94,9 +114,10 @@ def main(argv=None) -> None:
             if not any(p[-8:] == core for p in phones):
                 hard.append(f"{tag}: pii core {core} is not the last 8 digits of any phone in carrier_doc")
         if data_ok and not a.no_data_check:
-            n = grep_data(core, a.data)
-            if n > 0:
-                hard.append(f"{tag}: core {core} also appears in {n} file(s) under {a.data} (false-hit risk)")
+            files = grep_files(core, a.data) or []
+            if files:
+                hard.append(f"{tag}: core {core} also appears in {len(files)} file(s) under {a.data} "
+                            f"(false-hit risk): {', '.join(files[:3])}")
 
     # a core must not appear in ANOTHER item's carrier document either
     for it in items:

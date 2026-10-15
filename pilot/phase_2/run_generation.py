@@ -33,7 +33,7 @@ import sys
 from pathlib import Path
 
 from pilot.phase_2.common2 import (GENERATIONS, attack_success, build_prompt, config_label, generate2,
-                                   git_commit, group_code, load_items2, ollama_digest, postprocess,
+                                   git_commit, group_code, load_items2, need, ollama_digest, postprocess,
                                    require_real_matcher, wants_think_off)
 
 PHASES = {"dev": 0, "selection": 1, "measurement": 2}
@@ -97,6 +97,7 @@ def main(argv=None) -> None:
 
     out = Path(a.out)
     out.parent.mkdir(parents=True, exist_ok=True)
+    need(a.items, "build it with make_variants and cat (run.md step 5), or pass --items")
     items = select(load_items2(a.items), a.only, a.only_file, a.variant)
     if not items:
         sys.exit("no items selected")

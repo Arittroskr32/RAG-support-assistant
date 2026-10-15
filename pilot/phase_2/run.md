@@ -8,7 +8,7 @@ active. Each step says what it needs and which file it writes; all results land 
 |---|---|---|---|
 | 0 | Install, pull models, run the tests | no | test output |
 | 1 | Write down the decisions (A) | no | your `DECISIONS.md` |
-| 2 | Fill the 60 items (B1, B4) | no | `pilot_items2.jsonl` |
+| 2 | Fill the items (B1, B4) | no | `pilot_items2.jsonl` |
 | 3 | Write the benign and direct-injection data | no | `data/...` |
 | 4 | Validate the items | no | console |
 | 5 | Build the controls (C) | no | `variants2.jsonl`, `all_items2.jsonl` |
@@ -42,13 +42,19 @@ ollama pull qwen3:4b
 # E5 downloads by itself the first time it is used; to fetch it now:
 python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('intfloat/multilingual-e5-small')"
 
-python -m pytest -q pilot/phase_2/tests                   # expect: 29 passed
+python -m pytest -q pilot/phase_2/tests                   # expect: 33 passed
 ```
 
 If the tests do not all pass, stop and send the output; nothing below will be trustworthy.
 The tests use their own copies of the example files (`pilot/phase_2/tests/fixtures/`), so
 editing `pilot_items2.jsonl` or the data files never makes them fail; use the validator in
 step 4 to check your own data.
+
+At any point, this shows which inputs exist and which steps can run:
+
+```bash
+python -m pilot.phase_2.check_ready
+```
 
 ---
 
@@ -68,7 +74,11 @@ tagged style retrieves Bangla at least as well.
 
 ---
 
-## 2. Fill the 60 items (B1, B4)
+## 2. Fill the items (B1, B4)
+
+Already done if your `pilot_items2.jsonl` has no `TODO` left (yours has 80 items, 20 per group).
+The group of the native-Bangla items may be written `native` or `bangla`; both are read as the
+NT group.
 
 `pilot/phase_2/pilot_items2.jsonl` is a template: 15 items each for English (EN-101..115),
 Translated Bangla (TR-101..115), Banglish (BL-101..115) and Native Bangla (NT-101..115).
@@ -119,7 +129,10 @@ See `pilot/phase_2/data/README.md` for the exact formats. Write by hand (or edit
   no attack text. Calibration at 2% needs about 100 chunks per language (a chunk is roughly a
   short section).
 * `pilot/phase_2/data/benign_questions.jsonl`: questions with the document that answers them
-  (used in steps 6 and 9).
+  (used in steps 6 and 9). **A starter file is included**: 12 Bangla, 12 Banglish and 6 English
+  questions about the repository's FAQ and product documents (`author: "ai-draft"`). Read them,
+  fix anything that sounds unnatural, and add questions about your own benign documents
+  (`"gold_source": "benign_docs/bn/<file>.md"`) once you have written them.
 * `pilot/phase_2/data/direct_injection.jsonl`: direct attacks and benign prompts for RQ1, with
   seed families that are not in KB-2.
 
@@ -132,7 +145,21 @@ python -m pilot.phase_2.validate_items2
 ```
 
 Fix every `FAIL` line and re-run until it ends with `0 phase-2 hard failure(s)` and the phase-1
-checks exit with code 0. `WARN` lines are worth reading; the 12-item floor and the
+checks exit with code 0.
+
+**"core NNNN also appears in N file(s) under data/"** means a knowledge-base document contains
+the same digits, so a normal answer could look like a successful attack. The message names the
+file. Give those items new codes automatically (only the colliding items change; the old file is
+kept as `pilot_items2.jsonl.bak`), then validate again:
+
+```bash
+python -m pilot.phase_2.recore --dry-run      # see what would change
+python -m pilot.phase_2.recore
+python -m pilot.phase_2.validate_items2
+```
+
+`data/security_datasets/` (KB-2 / KB-6 training data) and planted `zz_*` files are not checked:
+they never reach the model. `WARN` lines are worth reading; the 12-item floor and the
 human-Banglish warning matter for the paper.
 
 ---
@@ -154,7 +181,8 @@ item and run this step again.
 
 ## 6. Bangla check (D2)
 
-Do this before using Qwen3-4B as the Bangla generator.
+Do this before using Qwen3-4B as the Bangla generator. It uses
+`pilot/phase_2/data/benign_questions.jsonl` (step 3; the starter file is enough to begin).
 
 ```bash
 python -m pilot.phase_2.bangla_check run --models llama3.2:3b qwen3:4b
@@ -229,7 +257,8 @@ rebuilds again. Do not run it while the API is running.
 python -m pilot.phase_2.calibrate --target 0.02                 # add --with-l3 on the GPU machine
 ```
 
-It picks every detector threshold on the benign documents so that 2% of benign chunks are
+It needs your benign documents from step 3 (`data/benign_docs/`) and stops with a message if
+there are none. It picks every detector threshold on the benign documents so that 2% of benign chunks are
 quarantined, and reports detection on the phase-1 attacks at those thresholds. Output:
 `results/calibration.json` and `calibration.md` (with `--e5-prefix tagged`:
 `calibration_tagged.json`). It does **not** change `config/thresholds.yaml`; copy the

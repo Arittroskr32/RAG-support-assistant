@@ -27,7 +27,7 @@ from pathlib import Path
 
 from pilot.phase_2 import tags
 from pilot.phase_2.common2 import (DATA2_DIR, RESULTS_DIR, ROOT, build_prompt, generate2, postprocess,
-                                   read_jsonl, wants_think_off)
+                                   need, read_jsonl, wants_think_off)
 
 REVIEW = ["correct", "same_language", "natural", "notes"]
 
@@ -42,6 +42,8 @@ def slug(model: str) -> str:
 
 
 def run(a) -> None:
+    need(a.questions, "benign questions with their gold document (run.md step 3, format in "
+                      "pilot/phase_2/data/README.md)")
     qs = [{**q, "question": tags.unwrap(q["question"], "query")}
           for q in read_jsonl(a.questions) if q["language"] in a.languages]
     if not qs:

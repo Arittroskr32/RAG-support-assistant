@@ -536,3 +536,57 @@ def test_routed_search_unwraps_query_and_strips_chunks(built_kb4, fake_e5):
     en = bn_route.RoutedSearch(lambda *a, **k: [RetrievedChunk("c", "<!><passage> hi <!passage>", {}, 0.1)])
     out = en([0.0], resolve_scope("hi", "customer", cfg), "default", cfg, query="<!><query> Where is my order? <!query>")
     assert out[0].text.strip() == "hi"
+
+
+# --------------------------------------------------------------------------- run fixes
+
+def test_group_alias_bangla_reads_as_native(tmp_path):
+    from pilot.phase_2.validate_items2 import phase2_checks
+    raw = common2.read_jsonl(EXAMPLE)
+    raw[0]["group"] = "bangla"
+    p = write_jsonl(tmp_path / "items.jsonl", raw)
+    items = common2.load_items2(p)
+    assert items[0]["group"] == "native" and items[0]["group_as_written"] == "bangla"
+    hard, soft = phase2_checks(items, [])
+    assert not [h for h in hard if "group" in h] and any("'bangla'" in s for s in soft)
+    items[1]["group"] = "klingon"
+    hard, _ = phase2_checks(items, [])
+    assert any("unknown group" in h for h in hard)
+
+
+def test_collision_check_skips_security_datasets_and_planted_files(tmp_path):
+    from pilot.phase_1.validate_items import grep_files
+    (tmp_path / "security_datasets").mkdir()
+    (tmp_path / "security_datasets" / "big.csv").write_text("id,4101\n")
+    (tmp_path / "public_faq").mkdir()
+    (tmp_path / "public_faq" / "zz_p2_EN-201.md").write_text("code 4101")
+    assert grep_files("4101", str(tmp_path)) == []
+    (tmp_path / "public_faq" / "faq.md").write_text("card ৪১০১ and 24101", encoding="utf-8")
+    assert grep_files("4101", str(tmp_path)) == [str(tmp_path / "public_faq" / "faq.md")]
+
+
+def test_recore_replaces_colliding_core_and_keeps_other_lines(tmp_path):
+    import json as _json
+    from pilot.phase_2 import recore
+    data = tmp_path / "data"
+    (data / "public_faq").mkdir(parents=True)
+    rows = common2.read_jsonl(EXAMPLE)
+    core = rows[0]["canary_core"]
+    (data / "public_faq" / "faq.md").write_text(f"order number {core}")
+    items = tmp_path / "items.jsonl"
+    items.write_text("\n".join(_json.dumps(r, ensure_ascii=False, separators=(",", ":")) for r in rows) + "\n",
+                     encoding="utf-8")
+    before = items.read_text(encoding="utf-8").splitlines()
+    recore.main(["--items", str(items), "--data", str(data)])
+    after = items.read_text(encoding="utf-8").splitlines()
+    assert after[1:] == before[1:]                                # untouched rows are byte-identical
+    new = _json.loads(after[0])
+    assert new["canary_core"] != core and core not in after[0]
+    assert new["canary_core"] in new["payload"] and new["canary_core"] in new["carrier_doc"]
+    assert (tmp_path / "items.jsonl.bak").exists()
+
+
+def test_missing_input_gives_a_message_not_a_traceback(tmp_path):
+    from pilot.phase_2 import bangla_check
+    with pytest.raises(SystemExit, match="missing .*benign questions"):
+        bangla_check.main(["run", "--questions", str(tmp_path / "none.jsonl")])

@@ -21,7 +21,7 @@ import re
 from collections import defaultdict
 from pathlib import Path
 
-from pilot.phase_2.common2 import GENERATIONS, RESULTS_DIR, is_success, read_jsonl
+from pilot.phase_2.common2 import GENERATIONS, RESULTS_DIR, is_success, need, read_jsonl
 
 
 def slug(model: str) -> str:
@@ -46,6 +46,7 @@ def main(argv=None) -> None:
     ap.add_argument("--out")
     a = ap.parse_args(argv)
 
+    need(a.gen, "run the selection runs first (run.md step 7)")
     rows = read_jsonl(a.gen)
     valid, runs = valid_items(rows, a.model, a.config)
     if not runs:

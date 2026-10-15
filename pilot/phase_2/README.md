@@ -25,7 +25,7 @@ explains what each script does.
 python -m pytest -q pilot/phase_2/tests
 ```
 
-29 tests cover every script with the repository's fake KB, fake guardrail, fake LLM and a fake E5
+33 tests cover every script with the repository's fake KB, fake guardrail, fake LLM and a fake E5
 embedder: seeds and the think switch are sent, controls are built without leftover payload
 fragments, stack configs restore everything they patch, calibration picks thresholds at the
 target rate, the statistics match hand-computed values, and refusal padding works.
@@ -196,7 +196,8 @@ held until that many ms after the request started), re-run the traffic and the s
 
 | Plan step | Script |
 |---|---|
-| B1 dev/test split, new families | `validate_items2.py` |
+| B1 dev/test split, new families | `validate_items2.py`, `recore.py` (new codes for colliding canaries) |
+| which steps can run now | `check_ready.py` |
 | B2 selection vs measurement runs | `run_generation.py --phase`, `select_valid.py` |
 | B3 real L6/L7 baseline | `run_generation.py --prompt real` (`common2.real_prompt`) |
 | B4 human Banglish | `author` field, `validate_items2.py` warning |

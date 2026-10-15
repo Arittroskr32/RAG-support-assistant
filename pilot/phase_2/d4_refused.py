@@ -28,7 +28,7 @@ import math
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from pilot.phase_2.common2 import RESULTS_DIR
+from pilot.phase_2.common2 import RESULTS_DIR, need
 
 PRE_GEN = {"L2", "L1", "L2b", "KB2", "L3"}
 
@@ -59,6 +59,8 @@ def main(argv=None) -> None:
 
     from pilot.phase_1.d4.d4_plot import load_events, loo_accuracy
 
+    need(a.events, "the API's security log; run the D4 traffic first (run.md step 13)")
+    need(a.traffic, "run pilot/phase_1/d4/d4_traffic.py first (run.md step 13)")
     ev = load_events(a.events)
     tr = pd.read_csv(a.traffic)
     df = tr.merge(ev, on="request_id", how="left")

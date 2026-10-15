@@ -33,7 +33,7 @@ import math
 from collections import defaultdict
 from pathlib import Path
 
-from pilot.phase_2.common2 import GENERATIONS, RESULTS_DIR, is_success, read_jsonl
+from pilot.phase_2.common2 import GENERATIONS, RESULTS_DIR, is_success, need, read_jsonl
 
 
 # --------------------------------------------------------------------------- statistics
@@ -291,6 +291,7 @@ def main(argv=None) -> None:
     if a.valid:
         data = json.loads(Path(a.valid).read_text(encoding="utf-8"))
         valid = set(data["items"] if isinstance(data, dict) else data)
+    need(a.gen, "run the generation steps first (run.md steps 7 and 8)")
     rows = load_generations(a.gen, a.phase, valid)
     md = ["# Phase 2 report", "", f"Generations: `{a.gen}`" + (f", phase {a.phase}" if a.phase else ", all phases")
           + (f", restricted to {len(valid)} valid items from `{a.valid}`" if valid is not None else "") + ".", ""]
