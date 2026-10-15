@@ -35,7 +35,7 @@ import time
 from pathlib import Path
 
 from pilot.phase_2 import tags
-from pilot.phase_2.common2 import DATA2_DIR, RESULTS_DIR, canary_hit, read_jsonl
+from pilot.phase_2.common2 import DATA2_DIR, RESULTS_DIR, canary_hit, need, read_jsonl
 
 FIELDS = ["sample_id", "label", "run", "seed_family", "language", "difficulty", "threat_class", "goal_type",
           "layer", "artifact", "applicable", "diagnostic", "flagged", "miss", "score", "latency_ms", "error"]
@@ -125,6 +125,8 @@ def run(a) -> None:
     if a.answers:
         from pilot.phase_2.stack_check2 import install_generator
         install_generator(a.model, a.temperature, a.base_url, "auto", native=True)(a.seed)
+    need(a.items, "direct-injection attacks and benign prompts (run.md step 3, example in "
+                  "pilot/phase_2/data/examples/direct_injection.jsonl)")
     items = read_jsonl(a.items)
     for it in items:                                   # <!><query> ... <!query> is allowed in the file
         it["text"] = tags.unwrap(it["text"], "query")

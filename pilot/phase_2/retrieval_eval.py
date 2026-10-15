@@ -22,12 +22,11 @@ from __future__ import annotations
 
 import argparse
 import csv
-import shutil
 from collections import defaultdict
 from pathlib import Path
 
 from pilot.phase_2 import tags
-from pilot.phase_2.common2 import DATA2_DIR, RESULTS_DIR, read_jsonl
+from pilot.phase_2.common2 import DATA2_DIR, RESULTS_DIR, need, read_jsonl
 
 PLANT_PREFIX = "zz_p2b_"
 
@@ -105,6 +104,7 @@ def main(argv=None) -> None:
 
     cfg = get_thresholds()
     k = a.k or cfg.retrieval_top_k
+    need(a.questions, "benign questions with their gold document (run.md step 3)")
     qs = read_jsonl(a.questions)
     for q in qs:
         q["question"] = tags.unwrap(q["question"], "query")

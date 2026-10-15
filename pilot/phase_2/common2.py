@@ -42,6 +42,8 @@ GENERATIONS = RESULTS_DIR / "generations2.jsonl"
 
 GROUPS = {"EN": "english", "TR": "translated", "BL": "banglish", "NT": "native"}
 GROUP_CODE = {v: k for k, v in GROUPS.items()}
+# Other names people use for the native-Bangla group; load_items2 reads them as "native".
+GROUP_ALIASES = {"bangla": "native", "bengali": "native", "native_bangla": "native", "bn": "native"}
 AUTHORS = {"human", "ai-draft+human-edit", "translated-ai+reviewed", "translated-human"}
 VARIANTS = {"attack", "positive_control", "base_rate"}
 REQUIRED = ["item_id", "seed_family", "group", "language", "technique", "goal_type",
@@ -51,6 +53,12 @@ _THINK = re.compile(r"<think>.*?</think>\s*", re.DOTALL | re.IGNORECASE)
 
 
 # --------------------------------------------------------------------------- items
+
+def need(path: str | Path, what: str) -> None:
+    """Stop with a plain message (not a traceback) when an input file is missing."""
+    if not Path(path).exists():
+        raise SystemExit(f"missing {path}: {what}")
+
 
 def read_jsonl(path: str | Path) -> list[dict]:
     with open(path, encoding="utf-8") as fh:
@@ -80,6 +88,8 @@ def load_items2(path: str | Path) -> list[dict]:
                         "carrier_doc": tags.is_wrapped(it["carrier_doc"], "passage")}
         it["question"] = tags.unwrap(it["question"], "query")
         it["carrier_doc"] = tags.unwrap(it["carrier_doc"], "passage")
+        if it["group"] in GROUP_ALIASES:
+            it["group_as_written"], it["group"] = it["group"], GROUP_ALIASES[it["group"]]
         it.setdefault("variant", "attack")
         if it["variant"] not in VARIANTS:
             raise ValueError(f"{it['item_id']}: unknown variant {it['variant']!r}")

@@ -29,7 +29,7 @@ import sys
 from collections import Counter
 
 from pilot.phase_2 import tags
-from pilot.phase_2.common2 import AUTHORS, PHASE1_ITEMS, load_items2, read_jsonl
+from pilot.phase_2.common2 import GROUPS, AUTHORS, PHASE1_ITEMS, load_items2, read_jsonl
 
 
 def tag_checks(raw: list[dict]) -> tuple[list[str], list[str]]:
@@ -79,6 +79,12 @@ def phase2_checks(items: list[dict], dev: list[dict]) -> tuple[list[str], list[s
             soft.append(f"{tag}: phish item without entity_sentence (base-rate control will use a draft)")
         if not it.get("user_request"):
             soft.append(f"{tag}: no user_request (positive control will use the payload as a draft)")
+    renamed = Counter(it["group_as_written"] for it in items if it.get("group_as_written"))
+    for g, n in renamed.items():
+        soft.append(f"{n} items have group {g!r}: read as 'native' (NT), the native-Bangla group")
+    unknown = sorted({it["group"] for it in items} - set(GROUPS.values()))
+    if unknown:
+        hard.append(f"unknown group(s) {unknown}: use english, translated, banglish or native")
     groups = Counter(it["group"] for it in items)
     for g, n in groups.items():
         if n < 12:

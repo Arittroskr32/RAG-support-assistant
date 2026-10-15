@@ -33,7 +33,7 @@ import argparse
 import re
 import sys
 
-from pilot.phase_2.common2 import RESULTS_DIR, load_items2, write_jsonl
+from pilot.phase_2.common2 import RESULTS_DIR, load_items2, need, write_jsonl
 
 BN_DIGITS = str.maketrans("০১২৩৪৫৬৭৮৯", "0123456789")
 TOKEN = re.compile(r"(?:https?://\S+|[\w.+-]+@[\w-]+(?:\.[\w-]+)+|[\w-]+(?:\.[\w-]+)+\.\w{2,}\S*)")
@@ -103,6 +103,7 @@ def main(argv=None) -> None:
     ap.add_argument("--only", choices=["pc", "br", "both"], default="both")
     a = ap.parse_args(argv)
 
+    need(a.items, "the phase-2 items (run.md step 2)")
     attacks = [i for i in load_items2(a.items) if i["variant"] == "attack"]
     rows, problems = [], []
     for it in attacks:

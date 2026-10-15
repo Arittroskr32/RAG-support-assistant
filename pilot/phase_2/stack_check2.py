@@ -39,7 +39,7 @@ import time
 from pathlib import Path
 
 from pilot.phase_2.common2 import (GROUPS, RESULTS_DIR, ROOT, canary_hit, generate2, git_commit, group_code,
-                                   load_items2, wants_think_off)
+                                   load_items2, need, wants_think_off)
 
 CONFIGS = ("deployed", "bangla_serving", "bangla_serving_bn")
 PREFIX = "zz_p2_"
@@ -229,11 +229,13 @@ def main(argv=None) -> None:
     import pipeline.orchestrator as orch
     from pilot.phase_2 import bn_route
 
+    need(a.items, "the phase-2 items (run.md step 2)")
     items = load_items2(a.items)
     if a.variant == "attack":
         items = [i for i in items if i["variant"] == "attack"]
     keep = set(a.ids)
     if a.only_file:
+        need(a.only_file, "run select_valid first (run.md step 7)")
         data = json.loads(Path(a.only_file).read_text(encoding="utf-8"))
         keep |= set(data["items"] if isinstance(data, dict) else data)
     chosen = {}
