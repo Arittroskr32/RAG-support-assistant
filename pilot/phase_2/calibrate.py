@@ -125,21 +125,30 @@ def main(argv=None) -> None:
         bn = bn_route.BNNative(bn_route.bn_attack_texts(extra=a.bn_extra, exclude_texts=test_payloads),
                                threshold=1.0)
 
-    def score_all(texts):
+    def score_all(texts, exclude=None):
         out = {"L2ext": [layers.l2_pattern(t, extended=True)["flagged"] for t in texts],
                "L2b": [layers.l2b_narrative(t)["score"] for t in texts]}
         if a.with_l3:
             out["L3"] = [layers.l3_guardrail(t)["flagged"] for t in texts]
         if bn:
             routed = [bn_route.is_bangla(t) for t in texts]
-            sims = bn.scores([t for t, r in zip(texts, routed) if r])
+            ex = None if exclude is None else [e for e, r in zip(exclude, routed) if r]
+            sims = bn.scores([t for t, r in zip(texts, routed) if r], exclude=ex)
             it = iter(sims)
             out["BN_native"] = [next(it) if r else None for r in routed]
         return out
 
     b_scores = score_all([c["text"] for c in benign])
     langs = [c["lang"] for c in benign]
-    a_scores = score_all([i["carrier_doc"] for i in attacks])
+    # The BN_native KB is built from phase-1 payloads. Scoring phase-1 attack documents against it
+    # would match each document to its own payload, so leave the document's seed family out.
+    lofo = None
+    if bn and is_phase1:
+        fam_payloads = defaultdict(set)
+        for i in attacks:
+            fam_payloads[i.get("seed_family")].add(i.get("payload", "").strip())
+        lofo = [fam_payloads[i.get("seed_family")] for i in attacks]
+    a_scores = score_all([i["carrier_doc"] for i in attacks], exclude=lofo)
     a_groups = [group_code(i) for i in attacks]
 
     targets = [a.target] + [t for t in a.target_extra if t != a.target]
@@ -183,7 +192,11 @@ def main(argv=None) -> None:
                 rate([f for f, lang in zip(b_scores[det], langs) if lang == L]) for L in LANGS) + " |")
 
     # attacks at the chosen thresholds
-    md += ["", "## Attack documents flagged at the chosen thresholds", "",
+    md += ["", "## Attack documents flagged at the chosen thresholds", ""]
+    if lofo is not None:
+        md += ["BN_native scores here leave each document's own seed family out of the attack KB "
+               "(the KB is built from these same phase-1 payloads).", ""]
+    md += [
            "| Detector | " + " | ".join(sorted(set(a_groups))) + " |", "|---|" + "---|" * len(set(a_groups))]
     chosen_thr = {"L2b": result["chosen"].get("narrative_match_threshold"),
                   "BN_native": result["chosen"].get("bn_native")}

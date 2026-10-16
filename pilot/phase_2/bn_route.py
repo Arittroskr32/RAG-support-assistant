@@ -243,12 +243,19 @@ class BNNative:
         self._np = np
         self.kb_emb = np.asarray(embed_query(attack_texts), dtype=float)
 
-    def scores(self, texts: list[str]) -> list[float]:
+    def scores(self, texts: list[str], exclude: list[set[str]] | None = None) -> list[float]:
+        """Max similarity to the attack KB. exclude[i] = KB texts to ignore for texts[i] (leave one
+        family out when the scored documents carry the KB's own payloads)."""
         if not texts:
             return []
         np = self._np
-        emb = np.asarray(embed_query(texts), dtype=float)
-        return (emb @ self.kb_emb.T).max(axis=1).round(4).tolist()
+        sims = np.asarray(embed_query(texts), dtype=float) @ self.kb_emb.T
+        if exclude is not None:
+            for i, ex in enumerate(exclude):
+                for j, t in enumerate(self.texts):
+                    if t in ex:
+                        sims[i, j] = -np.inf
+        return [round(float(x), 4) if np.isfinite(x) else None for x in sims.max(axis=1)]
 
     def score(self, text: str) -> float:
         return self.scores([text])[0]

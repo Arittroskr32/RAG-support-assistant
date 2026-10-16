@@ -207,6 +207,40 @@ def test_analyze_report_with_controls(tmp_path):
     assert "C1 positive control" in md and "C2 base rate" in md and "+100%" in md
 
 
+def test_paired_comparison_uses_all_items_when_restricted_to_valid(tmp_path):
+    """--valid keeps only the valid attacks for the rates, but the language comparison runs on
+    every shared family of the selection runs, so it is not reduced to the few valid families."""
+    from pilot.phase_2 import analyze as an
+    rows = []
+    for fam in range(1, 7):
+        for g, s in (("EN", 1), ("BL", 0)):
+            for phase in ("selection", "measurement"):
+                if phase == "measurement" and g == "BL":
+                    continue                        # only EN items were valid, so only they were re-run
+                rows.append({"item_id": f"{g}-{fam}", "parent_id": f"{g}-{fam}", "variant": "attack",
+                             "seed_family": f"f{fam}", "group": g, "group_code": g, "goal_type": "marker",
+                             "model": "m", "config": "real", "phase": phase, "run": 1, "seed": 1,
+                             "temperature": 0.2, "think_sent": None, "success": s, "error": "", "manual_check": ""})
+    gen = write_jsonl(tmp_path / "g.jsonl", rows)
+    valid = tmp_path / "valid.json"
+    valid.write_text(json.dumps({"items": [f"EN-{f}" for f in range(1, 7)]}))
+    out = tmp_path / "r.md"
+    an.main(["--gen", str(gen), "--phase", "measurement", "--valid", str(valid), "--stack", "--out", str(out)])
+    md = out.read_text()
+    assert "| m | real | selection | EN vs BL | 6 | 6 | 0 | 0.0312" in md
+    assert "All items, phase selection" in md
+
+
+def test_bn_native_leave_one_out(fake_e5):
+    from pilot.phase_2 import bn_route
+    texts = bn_route.bn_attack_texts()[:3]
+    bn = bn_route.BNNative(texts, threshold=0.5)
+    full = bn.scores([texts[0]])[0]
+    held_out = bn.scores([texts[0]], exclude=[{texts[0]}])[0]
+    assert full == pytest.approx(1.0, abs=1e-3) and held_out < full
+    assert bn.scores([texts[0]], exclude=[set(texts)]) == [None]
+
+
 # --------------------------------------------------------------------------- Bangla route
 
 def test_router():
@@ -337,6 +371,22 @@ def test_stack_check2_three_configs(built_kb4, fake_guardrail, fake_local_llm, f
     assert "bangla_serving_bn | fake | BL | 1 | 0/1 (0%)" in md
 
 
+def test_factor_table_leaves_out_generator_errors(tmp_path):
+    from pilot.phase_2 import analyze as an
+    base = {"config": "deployed", "model": "m", "group": "NT", "quarantined": "False", "blocked_at": "",
+            "own_payload_retrieved": "True", "canary_in_raw": "False", "canary_in_answer": "False",
+            "other_canaries_in_answer": "", "external_markup": "0"}
+    rows = [base, {**base, "canary_in_raw": "True", "canary_in_answer": "True"},
+            {**base, "blocked_at": "L7-error"}]
+    f = tmp_path / "stack2_x.csv"
+    with open(f, "w", newline="", encoding="utf-8") as fh:
+        w = csv.DictWriter(fh, fieldnames=list(base))
+        w.writeheader()
+        w.writerows(rows)
+    md = "\n".join(an.factor_table([str(f)]))
+    assert "| deployed | m | NT | 2 | 2/2 (100%) | 2/2 (100%) |" in md and md.rstrip().endswith("| 1 |")
+
+
 # --------------------------------------------------------------------------- calibration + retrieval
 
 def test_threshold_helpers():
@@ -360,7 +410,7 @@ def test_calibrate_end_to_end(built_kb4, fake_e5, tmp_path):
     res = json.loads((tmp_path / "calibration.json").read_text())
     assert "bn_native" in res["chosen"] and "narrative_match_threshold" in res["chosen"]
     assert res["n_benign_chunks"] == {"en": 1, "bn": 1, "banglish": 1}
-    assert (tmp_path / "calibration.md").exists()
+    assert "leave each document's own seed family out" in (tmp_path / "calibration.md").read_text()
 
 
 def test_retrieval_eval(built_kb4, fake_e5, tmp_path, monkeypatch):
