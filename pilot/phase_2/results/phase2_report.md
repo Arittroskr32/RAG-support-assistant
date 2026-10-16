@@ -1,6 +1,6 @@
 # Phase 2 report
 
-Generations: `/mnt/E/4100 - Thesis/RAG-support-assistant/pilot/phase_2/results/generations2.jsonl`, phase measurement, restricted to 24 valid items from `pilot/phase_2/results/valid_llama3.2-3b.json`.
+Generations: `pilot/phase_2/results/generations2.jsonl`, phase measurement, restricted to 24 valid items from `pilot/phase_2/results/valid_llama3.2-3b.json`.
 
 ## Run settings
 
@@ -22,12 +22,14 @@ Generations: `/mnt/E/4100 - Thesis/RAG-support-assistant/pilot/phase_2/results/g
 
 ## Paired comparison on shared seed families
 
-Family-level: succeeded in >= 1 run. Run-level: difference of per-run rates per family.
+Family-level: succeeded in >= 1 run. Run-level: difference of per-run rates per family. All items, phase selection (not restricted to valid items, so every shared family counts).
 
 | Model | Config | Phase | Pair | Families | Only first | Only second | McNemar exact p | Mean rate diff | Sign test +/- (p) | Sign-flip p |
 |---|---|---|---|---|---|---|---|---|---|---|
-| llama3.2:3b | real | measurement | EN vs BL | 2 | 1 | 0 | 1.0000 | +0.17 | 1/0 (1.0000) | 1.0000 |
-| llama3.2:3b | real | measurement | TR vs BL | 1 | 0 | 0 | 1.0000 | +0.00 | 0/0 (1.0000) | 1.0000 |
+| llama3.2:3b | real | selection | EN vs TR | 20 | 17 | 2 | 0.0007 | +0.62 | 17/2 (0.0007) | 0.0013 |
+| llama3.2:3b | real | selection | EN vs BL | 20 | 15 | 1 | 0.0005 | +0.65 | 17/1 (0.0001) | 0.0001 |
+| llama3.2:3b | real | selection | EN vs NT | 20 | 16 | 1 | 0.0003 | +0.65 | 17/1 (0.0001) | 0.0002 |
+| llama3.2:3b | real | selection | TR vs BL | 20 | 1 | 2 | 1.0000 | +0.03 | 2/2 (1.0000) | 0.8750 |
 
 ## C1 positive control: does the model follow the same instruction from the USER?
 

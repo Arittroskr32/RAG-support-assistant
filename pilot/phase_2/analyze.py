@@ -159,9 +159,10 @@ def family_rates(rows) -> dict:
     return out
 
 
-def paired_table(rows, pairs=(("EN", "TR"), ("EN", "BL"), ("TR", "BL"))) -> list[str]:
+def paired_table(rows, pairs=(("EN", "TR"), ("EN", "BL"), ("EN", "NT"), ("TR", "BL")), note: str = "") -> list[str]:
     md = ["## Paired comparison on shared seed families", "",
-          "Family-level: succeeded in >= 1 run. Run-level: difference of per-run rates per family.", "",
+          "Family-level: succeeded in >= 1 run. Run-level: difference of per-run rates per family."
+          + (f" {note}" if note else ""), "",
           "| Model | Config | Phase | Pair | Families | Only first | Only second | McNemar exact p | "
           "Mean rate diff | Sign test +/- (p) | Sign-flip p |", "|---|---|---|---|---|---|---|---|---|---|---|"]
     for (m, c, p), groups in sorted(family_rates(rows).items()):
@@ -283,6 +284,9 @@ def main(argv=None) -> None:
     ap.add_argument("--gen", default=str(GENERATIONS))
     ap.add_argument("--phase", choices=["dev", "selection", "measurement"], default=None)
     ap.add_argument("--valid", help="valid_<model>.json: restrict to those items (use with --phase measurement)")
+    ap.add_argument("--paired-phase", choices=["dev", "selection", "measurement"], default=None,
+                    help="phase for the language comparison, always on ALL items (default: selection when "
+                         "--valid is given, since measurement runs only cover valid items; else --phase)")
     ap.add_argument("--stack", nargs="*", default=None, help="stack2_*.csv files (default: all in results/)")
     ap.add_argument("--out", default=str(RESULTS_DIR / "phase2_report.md"))
     a = ap.parse_args(argv)
@@ -299,7 +303,13 @@ def main(argv=None) -> None:
         md += ["> Warning: valid items were chosen on the selection runs; report defence effects on the "
                "measurement runs only (--phase measurement), or regression to the mean inflates them.", ""]
     if rows:
-        md += settings_table(rows) + rate_table(rows) + paired_table(rows) + control_tables(rows)
+        # The language comparison must not use the valid-attack subset: which items are "valid" depends on
+        # the language, so restricting to them leaves almost no shared families. Use all items instead.
+        paired_phase = a.paired_phase or ("selection" if valid is not None else a.phase)
+        paired_rows = rows if valid is None and paired_phase == a.phase else load_generations(a.gen, paired_phase, None)
+        note = "" if paired_rows is rows else (f"All items, phase {paired_phase} (not restricted to valid "
+                                               f"items, so every shared family counts).")
+        md += settings_table(rows) + rate_table(rows) + paired_table(paired_rows, note=note) + control_tables(rows)
     else:
         md += ["_No generation rows found._", ""]
     stack = a.stack if a.stack is not None else sorted(glob.glob(str(RESULTS_DIR / "stack2_*.csv")))
