@@ -371,6 +371,22 @@ def test_stack_check2_three_configs(built_kb4, fake_guardrail, fake_local_llm, f
     assert "bangla_serving_bn | fake | BL | 1 | 0/1 (0%)" in md
 
 
+def test_factor_table_leaves_out_generator_errors(tmp_path):
+    from pilot.phase_2 import analyze as an
+    base = {"config": "deployed", "model": "m", "group": "NT", "quarantined": "False", "blocked_at": "",
+            "own_payload_retrieved": "True", "canary_in_raw": "False", "canary_in_answer": "False",
+            "other_canaries_in_answer": "", "external_markup": "0"}
+    rows = [base, {**base, "canary_in_raw": "True", "canary_in_answer": "True"},
+            {**base, "blocked_at": "L7-error"}]
+    f = tmp_path / "stack2_x.csv"
+    with open(f, "w", newline="", encoding="utf-8") as fh:
+        w = csv.DictWriter(fh, fieldnames=list(base))
+        w.writeheader()
+        w.writerows(rows)
+    md = "\n".join(an.factor_table([str(f)]))
+    assert "| deployed | m | NT | 2 | 2/2 (100%) | 2/2 (100%) |" in md and md.rstrip().endswith("| 1 |")
+
+
 # --------------------------------------------------------------------------- calibration + retrieval
 
 def test_threshold_helpers():
