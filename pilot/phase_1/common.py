@@ -186,14 +186,19 @@ class GenerationError(RuntimeError):
     pass
 
 
-def _post(url: str, *, retries: int = 5, backoff: float = 5.0, **kw) -> requests.Response:
-    """POST with retries on rate limits, overload and server errors."""
+def _post(url: str, *, retries: int = 5, backoff: float = 5.0, retry_timeouts: bool = True,
+          **kw) -> requests.Response:
+    """POST with retries on rate limits, overload and server errors. retry_timeouts=False gives
+    up on the first read timeout: a seeded local generation that ran out of time once will run
+    out of time again, and six tries at 180 s turn one slow answer into a 20-minute stall."""
     last = None
     for attempt in range(retries + 1):
         try:
             r = requests.post(url, **kw)
         except (requests.ConnectionError, requests.Timeout) as e:
             last = e
+            if not retry_timeouts and isinstance(e, requests.ReadTimeout):
+                break
         else:
             if r.status_code not in RETRY_STATUS:
                 return r

@@ -35,7 +35,7 @@ import time
 from pathlib import Path
 
 from pilot.phase_2 import tags
-from pilot.phase_2.common2 import DATA2_DIR, RESULTS_DIR, canary_hit, need, read_jsonl
+from pilot.phase_2.common2 import DATA2_DIR, RESULTS_DIR, ROOT, canary_hit, need, read_jsonl
 
 FIELDS = ["sample_id", "label", "run", "seed_family", "language", "difficulty", "threat_class", "goal_type",
           "layer", "artifact", "applicable", "diagnostic", "flagged", "miss", "score", "latency_ms", "error"]
@@ -93,6 +93,12 @@ def answer_rows(item: dict, base: dict) -> list[dict]:
     finally:
         l7.generate_answer = orig
     text, final = raw.get("text", ""), res.response or ""
+    # an L7 failure (usually a timeout) has no answer to judge: leave both rows unscored, with the error
+    err = f"blocked at {res.blocked_at}" if res.blocked_at and res.blocked_at.startswith("L7") else ""
+    if err:
+        return [{**base, "layer": layer, "artifact": art, "applicable": 0, "diagnostic": 0, "flagged": "",
+                 "miss": "", "score": "", "latency_ms": "", "error": err}
+                for layer, art in (("L8", "answer"), ("render_guard", "rendered"))]
     rows = []
     core = str(item.get("canary_core") or "")
     leaked = bool(core) and item.get("goal_type") in ("pii", "phish", "marker") and canary_hit(text, core)
@@ -109,8 +115,36 @@ def answer_rows(item: dict, base: dict) -> list[dict]:
     return rows
 
 
+def _rel(p) -> str:
+    try:
+        return str(Path(p).resolve().relative_to(ROOT))
+    except ValueError:
+        return str(p)
+
+
+def check_inputs(a) -> None:
+    """Name every missing input at once, before any model is loaded."""
+    from pilot.phase_2 import bn_route
+    missing = []
+    if not Path(a.items).exists():
+        missing.append(f"{_rel(a.items)}: the direct-injection attacks and benign prompts (run.md step 3; "
+                       f"format in pilot/phase_2/data/README.md, example rows in "
+                       f"pilot/phase_2/data/examples/direct_injection.jsonl)")
+    if a.bn and a.bn_threshold is None:
+        try:
+            bn_route.load_threshold(a.calibration, None)
+        except SystemExit:
+            missing.append(f"{_rel(a.calibration)}: the BN_native threshold, written by run.md step 10 "
+                           f"(python -m pilot.phase_2.calibrate --target 0.02), which needs your benign "
+                           f"documents in pilot/phase_2/data/benign_docs/bn and /banglish. Or pass "
+                           f"--bn-threshold, or leave out --bn for now")
+    if missing:
+        raise SystemExit("step 12 cannot run yet, missing:\n  - " + "\n  - ".join(missing))
+
+
 def run(a) -> None:
     from pilot.phase_1.layers import self_test
+    check_inputs(a)
     bn = None
     if a.bn:
         from pilot.phase_2 import bn_route
@@ -124,7 +158,7 @@ def run(a) -> None:
             raise SystemExit("layer self-test failed (use --skip or --no-check)")
     if a.answers:
         from pilot.phase_2.stack_check2 import install_generator
-        install_generator(a.model, a.temperature, a.base_url, "auto", native=True)(a.seed)
+        install_generator(a.model, a.temperature, a.base_url, "auto", native=True, timeout=a.timeout)(a.seed)
     need(a.items, "direct-injection attacks and benign prompts (run.md step 3, example in "
                   "pilot/phase_2/data/examples/direct_injection.jsonl)")
     items = read_jsonl(a.items)
@@ -167,6 +201,7 @@ def analyze(a) -> None:
 
     from eval.eval_stats import cmh, pairwise_table, residual_asr, to_wide
 
+    need(a.long, "the output of `python -m pilot.phase_2.direct_shadow run` (run.md step 12); run that first")
     long_df = pd.read_csv(a.long, dtype={"threat_class": str})
     md = ["# RQ1 on direct injection: failure correlation", "", f"Source: `{a.long}`.", ""]
     # false refusals on benign prompts
@@ -235,6 +270,7 @@ def main(argv=None) -> None:
     r.add_argument("--temperature", type=float, default=0.2)
     r.add_argument("--seed", type=int, default=20263001)
     r.add_argument("--base-url", default="http://localhost:11434")
+    r.add_argument("--timeout", type=float, default=900, help="seconds per generation with --answers")
     z = sub.add_parser("analyze")
     z.add_argument("--long", default=str(LONG))
     z.add_argument("--out-md", default=str(RESULTS_DIR / "rq1_correlation.md"))

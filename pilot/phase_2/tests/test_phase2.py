@@ -404,6 +404,36 @@ def test_direct_shadow_run_and_analyze(built_kb4, fake_guardrail, tmp_path):
     assert "q_L2 x q_L3 | same artifact" in text and "False refusals" in text
 
 
+def test_direct_shadow_names_missing_inputs(tmp_path):
+    from pilot.phase_2 import direct_shadow
+    with pytest.raises(SystemExit) as e:
+        direct_shadow.main(["run", "--bn", "--items", str(tmp_path / "none.jsonl"),
+                            "--calibration", str(tmp_path / "calibration.json")])
+    msg = str(e.value)
+    assert "none.jsonl" in msg and "calibration.json" in msg and "calibrate" in msg
+    with pytest.raises(SystemExit, match="direct_shadow run"):
+        direct_shadow.main(["analyze", "--long", str(tmp_path / "long.csv")])
+
+
+def test_post_gives_up_on_first_read_timeout(monkeypatch):
+    import requests
+
+    from pilot.phase_1 import common
+    calls = []
+
+    def slow(url, **kw):
+        calls.append(url)
+        raise requests.ReadTimeout("read timed out")
+    monkeypatch.setattr(common.requests, "post", slow)
+    monkeypatch.setattr(common.time, "sleep", lambda s: None)
+    with pytest.raises(common.GenerationError):
+        common._post("http://x", retry_timeouts=False, timeout=1)
+    assert len(calls) == 1
+    with pytest.raises(common.GenerationError):
+        common._post("http://x", timeout=1)
+    assert len(calls) == 1 + 6
+
+
 # --------------------------------------------------------------------------- D4
 
 def test_d4_refused_only(tmp_path):
