@@ -42,7 +42,7 @@ ollama pull qwen3:4b
 # E5 downloads by itself the first time it is used; to fetch it now:
 python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('intfloat/multilingual-e5-small')"
 
-python -m pytest -q pilot/phase_2/tests                   # expect: 33 passed
+python -m pytest -q pilot/phase_2/tests                   # expect: 35 passed
 ```
 
 If the tests do not all pass, stop and send the output; nothing below will be trustworthy.
@@ -303,6 +303,15 @@ python -m pilot.phase_2.direct_shadow analyze                                   
 ```
 
 Without the GPU guardrail add `--skip q_L3` to the `run` lines (and say so in the paper).
+
+It needs two inputs, and stops with a list of whichever are missing: your
+`pilot/phase_2/data/direct_injection.jsonl` (step 3) and, for `--bn`, the BN_native threshold
+in `results/calibration.json` (step 10, which needs your benign documents). Until step 10 has
+run you can leave out `--bn`; the BN_native column is then missing from the tables.
+
+Generations with `--answers` (and in step 11) wait up to 900 s each (`--timeout`) and are not
+retried after a timeout. Long Bangla answers from llama3.2:3b can take several minutes; with the
+API's 180 s timeout and its retries they ended as `blocked:L7-error` after about 20 minutes.
 
 ---
 

@@ -168,7 +168,7 @@ def wants_think_off(model: str, think: str) -> bool | None:
 def generate2(backend: str, model: str, system: str, user: str, *, seed: int | None,
               base_url: str = "http://localhost:11434", temperature: float = 0.2,
               max_tokens: int = 1024, num_ctx: int = 8192, think: bool | None = None,
-              timeout: int = 600) -> dict:
+              timeout: int = 600, retry_timeouts: bool = True) -> dict:
     """Like phase 1's generate(), but sends a seed and (Ollama) the think switch.
 
     Returns {"text", "latency_s", "finish", "prompt_tokens", "completion_tokens",
@@ -183,12 +183,12 @@ def generate2(backend: str, model: str, system: str, user: str, *, seed: int | N
         if think is not None:
             body["think"] = think
         t0 = time.perf_counter()
-        r = _post(f"{root}/api/chat", timeout=timeout, json=body)
+        r = _post(f"{root}/api/chat", timeout=timeout, retry_timeouts=retry_timeouts, json=body)
         think_sent = think
         if r.status_code == 400 and "think" in r.text.lower() and "think" in body:
             body.pop("think")                 # model or Ollama version without the switch
             think_sent = None
-            r = _post(f"{root}/api/chat", timeout=timeout, json=body)
+            r = _post(f"{root}/api/chat", timeout=timeout, retry_timeouts=retry_timeouts, json=body)
         if r.status_code != 200:
             raise GenerationError(f"HTTP {r.status_code}: {r.text[:300]}")
         j = r.json()
@@ -203,7 +203,7 @@ def generate2(backend: str, model: str, system: str, user: str, *, seed: int | N
         if seed is not None:
             body["seed"] = seed
         t0 = time.perf_counter()
-        r = _post(f"{root}/v1/chat/completions", timeout=timeout, json=body)
+        r = _post(f"{root}/v1/chat/completions", timeout=timeout, retry_timeouts=retry_timeouts, json=body)
         if r.status_code != 200:
             raise GenerationError(f"HTTP {r.status_code}: {r.text[:300]}")
         j = r.json()

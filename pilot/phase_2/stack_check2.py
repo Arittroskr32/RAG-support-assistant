@@ -114,9 +114,13 @@ class Capture:
         return res
 
 
-def install_generator(model: str, temperature: float, base_url: str, think: str, native: bool):
+def install_generator(model: str, temperature: float, base_url: str, think: str, native: bool,
+                      timeout: float | None = None):
     """Point L7 at --model; with native=True use Ollama's /api/chat so a seed and the think
-    switch can be sent. Returns a function to set the seed of the next call."""
+    switch can be sent. Returns a function to set the seed of the next call.
+
+    timeout (s) replaces LOCAL_LLM_TIMEOUT_S (180 s), which is too short for long Bangla answers
+    from a small model on a laptop GPU/CPU; a timed-out call is not retried (see _post)."""
     from generation import l7_generation as l7
     l7.MODEL_SETTINGS = dataclasses.replace(l7.MODEL_SETTINGS, generation_backend="local",
                                             local_llm_model=model, local_llm_temperature=temperature)
@@ -127,7 +131,8 @@ def install_generator(model: str, temperature: float, base_url: str, think: str,
         def _native(system, user, settings):
             g = generate2("ollama", settings.local_llm_model, system, user, seed=state["seed"], base_url=base_url,
                           temperature=settings.local_llm_temperature, max_tokens=settings.local_llm_max_tokens,
-                          think=think_flag, timeout=int(settings.local_llm_timeout_s))
+                          think=think_flag, timeout=int(timeout or settings.local_llm_timeout_s),
+                          retry_timeouts=False)
             return g["text"], f"ollama:{settings.local_llm_model}", g.get("finish", "")
         l7._generate_local = _native
     return lambda s: state.update(seed=s)
@@ -200,6 +205,8 @@ def main(argv=None) -> None:
     ap.add_argument("--seed-base", type=int, default=20261012)
     ap.add_argument("--temperature", type=float, default=0.2)
     ap.add_argument("--base-url", default="http://localhost:11434")
+    ap.add_argument("--timeout", type=float, default=900,
+                    help="seconds per generation before L7 gives up (default 900; the API's own default is 180)")
     ap.add_argument("--think", choices=["auto", "off", "on"], default="auto")
     ap.add_argument("--openai-compat", action="store_true",
                     help="use the repository's OpenAI-compatible call (no seed is sent)")
@@ -265,7 +272,8 @@ def run_all(a, items, chosen, orch, l7, bn_route, get_thresholds) -> None:
     if e5:
         searcher = bn_route.RoutedSearch(orch.secure_search, route_all=a.route_all, max_distance=a.e5_max_distance)
         orch.secure_search = searcher
-    set_seed = install_generator(a.model, a.temperature, a.base_url, a.think, native=not a.openai_compat)
+    set_seed = install_generator(a.model, a.temperature, a.base_url, a.think, native=not a.openai_compat,
+                                 timeout=a.timeout)
     capture = Capture(l7.generate_answer)
     l7.generate_answer = capture
 
@@ -321,7 +329,7 @@ def run_all(a, items, chosen, orch, l7, bn_route, get_thresholds) -> None:
     meta = {"time": datetime.datetime.now().isoformat(timespec="seconds"), "config": a.config, "model": a.model,
             "runs": a.runs, "seed_base": a.seed_base, "temperature": a.temperature, "scan": not a.no_scan,
             "with_l3": a.with_l3, "bn_threshold": bn.threshold if bn else None, "route_all": a.route_all,
-            "e5_max_distance": a.e5_max_distance, "e5_prefix": a.e5_prefix, "native_ollama": not a.openai_compat,
+            "e5_max_distance": a.e5_max_distance, "e5_prefix": a.e5_prefix, "native_ollama": not a.openai_compat, "timeout_s": a.timeout,
             "thresholds": dataclasses.asdict(cfg), "git_commit": git_commit(), "items": a.items,
             "n_rows": len(rows), "csv": f"{stem}.csv"}
     with open(out_dir / "stack2_runs.jsonl", "a", encoding="utf-8") as fh:
