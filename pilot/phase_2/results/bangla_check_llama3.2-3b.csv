@@ -1,0 +1,37 @@
+﻿qid,language,model,question,answer,latency_s,error,correct,same_language,natural,notes
+bn-001,bn,llama3.2:3b,আমি কীভাবে আমার পাসওয়ার্ড রিসেট করব?,"To reset your password, go to Settings > Account > Reset Password and follow the emailed link. The link expires after 24 hours.",12.18,,,,,
+bn-002,bn,llama3.2:3b,পাসওয়ার্ড রিসেটের লিংক কতক্ষণ কাজ করে?,The password reset link expires after 24 hours.,4.41,,,,,
+bn-003,bn,llama3.2:3b,সাপোর্ট টিম কোন কোন দিন আর কয়টা থেকে কয়টা পর্যন্ত খোলা থাকে?,"Our support team is available Sunday to Thursday, 9:00 to 18:00.",5.01,,,,,
+bn-004,bn,llama3.2:3b,আমার সাবস্ক্রিপশন কীভাবে বাতিল করব?,"To cancel your subscription, go to Settings > Billing > Cancel Subscription. You'll retain access until the end of your current billing period.",4.87,,,,,
+bn-005,bn,llama3.2:3b,সাবস্ক্রিপশন বাতিল করলে কতদিন পর্যন্ত অ্যাক্সেস থাকবে?,You can cancel your subscription and retain access until the end of your current billing period.,4.71,,,,,
+bn-006,bn,llama3.2:3b,নতুন অ্যাকাউন্টে কি ফ্রি ট্রায়াল আছে? কতদিনের?,"Yes, a free trial is available for new accounts. The trial period is 14 days.
+
+You can access the free trial by creating a new account.",4.93,,,,,
+bn-007,bn,llama3.2:3b,সাপোর্টের সাথে কীভাবে যোগাযোগ করব?,"To contact support, you can email support@example.com or call 555-010-0199 during support hours. For urgent outages, use the status page link in your dashboard.",5.1,,,,,
+bn-008,bn,llama3.2:3b,জরুরি সমস্যা হলে কী করব?,"If you're experiencing an urgent issue, you can use the status page link in your dashboard to get the latest information on outages and maintenance.",4.91,,,,,
+bn-009,bn,llama3.2:3b,আপনাদের কয়টা প্ল্যান আছে?,"We have three plans: Starter, Pro, and Enterprise.",4.11,,,,,
+bn-010,bn,llama3.2:3b,Pro প্ল্যানে Starter-এর চেয়ে বেশি কী পাওয়া যায়?,"The Pro plan offers additional features compared to the Starter plan, including team collaboration and higher usage limits.",4.3,,,,,
+bn-011,bn,llama3.2:3b,কোন প্ল্যানে SSO আর ডেডিকেটেড সাপোর্ট আছে?,"Our platform offers three tiers: Starter, Pro, and Enterprise. Starter includes core functionality for individuals. Pro adds team collaboration and higher usage limits. Enterprise adds SSO, dedicated support, and custom SLAs.
+
+SSO is available on the Enterprise plan.",5.06,,,,,
+bn-012,bn,llama3.2:3b,একা ব্যবহারের জন্য কোন প্ল্যান ভালো?,"The solo user plan is called ""Starter"". It includes core functionality for individuals.",4.37,,,,,
+bl-001,banglish,llama3.2:3b,Ami kivabe amar password reset korbo?,Amar password reset kora jane? Go to Settings > Account > Reset Password and follow the emailed link. Links expire after 24 hours.,4.7,,,,,
+bl-002,banglish,llama3.2:3b,Password reset er link koto ghonta porjonto kaj kore?,The password reset link expires after 24 hours.,4.21,,,,,
+bl-003,banglish,llama3.2:3b,Support team kon din ar koyta theke koyta porjonto available thake?,আপনার সমর্থন দল রোজ সোমবার থেকে বৃহস্পতিবার পর্যন্ত ৯:০০ থেকে ১৮:০০ পর্যন্ত কাজ করে। আপনি তাদের চ্যাট ওয়ান্ডো বা কম্প্যানির কম্প্লাইন্ট ফর্ম দিয়ে তাদের সংযোগ করতে পারেন।,9.14,,,,,
+bl-004,banglish,llama3.2:3b,Amar subscription ta kivabe cancel korbo?,"To cancel your subscription, go to Settings > Billing > Cancel Subscription. You'll retain access until the end of your current billing period.",4.68,,,,,
+bl-005,banglish,llama3.2:3b,Subscription cancel korle access koto din thakbe?,"To cancel your subscription, go to Settings > Billing > Cancel Subscription. You'll retain access until the end of your current billing period.",4.85,,,,,
+bl-006,banglish,llama3.2:3b,Notun account e ki free trial ache? Koto diner?,"You're asking if your account has a free trial and for how long. The answer is yes, all new accounts get a 14-day free trial with full access to core features.",4.89,,,,,
+bl-007,banglish,llama3.2:3b,Support er sathe kivabe jogajog korbo?,"To reset your password, go to Settings > Account > Reset Password and follow the emailed link. The link expires after 24 hours.
+
+Unfortunately, I don't know how to reset your password. I can offer to escalate this issue to a human agent who can assist you further.",5.38,,,,,
+bl-008,banglish,llama3.2:3b,Urgent outage hole ami ki korbo?,I don't know how to reset your password. Can I help you escalate this to a human agent?,4.51,,,,,
+bl-009,banglish,llama3.2:3b,Apnader koyta plan ache?,"The platform offers three plans: Starter, Pro, and Enterprise. 
+
+Starter plan includes core functionality for individuals. 
+Pro plan adds team collaboration and higher usage limits. 
+Enterprise plan adds SSO, dedicated support, and custom SLAs.
+
+If you're looking for more information on the plans or need help choosing the right one, you can contact our support team. They are available Sunday to Thursday, 9:00 to 18:00, and can be reached through the chat window or the contact form.",6.2,,,,,
+bl-010,banglish,llama3.2:3b,Pro plan e Starter er theke beshi ki pabo?,"The Pro plan adds team collaboration and higher usage limits compared to the Starter plan. The Enterprise plan adds SSO, dedicated support, and custom SLAs.",4.39,,,,,
+bl-011,banglish,llama3.2:3b,Kon plan e SSO ar dedicated support ache?,The Enterprise plan includes SSO (Single Sign-On) and dedicated support.,3.98,,,,,
+bl-012,banglish,llama3.2:3b,Ekla use korar jonno kon plan ta bhalo hobe?,"The best plan for Ekla to use would be the Pro plan, as it includes team collaboration and higher usage limits. This plan is suitable for individuals who need to collaborate with others or require more features.",4.63,,,,,
