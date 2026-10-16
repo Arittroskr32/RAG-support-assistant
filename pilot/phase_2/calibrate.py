@@ -42,11 +42,13 @@ LANGS = ("en", "bn", "banglish")
 def load_benign(benign_dir: Path, include_repo_data: bool) -> list[dict]:
     """Benign chunks: [{"lang", "source", "text"}], chunked like ingestion does."""
     from ingestion.chunkers import chunk_document
+    from ingestion.loaders import parse_front_matter
     docs = []
     for lang in LANGS:
         for p in sorted((benign_dir / lang).glob("*")):
             if p.suffix.lower() in (".md", ".txt"):
-                docs.append((lang, f"{lang}/{p.name}", tags.unwrap(p.read_text(encoding="utf-8"), "passage")))
+                text = tags.unwrap(p.read_text(encoding="utf-8"), "passage")
+                docs.append((lang, f"{lang}/{p.name}", parse_front_matter(text)[1]))   # as ingestion does
     if include_repo_data:
         from ingestion.loaders import load_documents
         for d in load_documents(ROOT / "data"):
