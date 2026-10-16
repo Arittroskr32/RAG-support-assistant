@@ -17,13 +17,17 @@ Benign chunks: {'en': 102, 'bn': 102, 'banglish': 102}. Attack documents: 56 fro
 | Detector | en | bn | banglish |
 |---|---|---|---|
 | L2ext | 0/102 (0.0%) | 0/102 (0.0%) | 0/102 (0.0%) |
+| L3 | 4/102 (3.9%) | 41/102 (40.2%) | 19/102 (18.6%) |
 
 ## Attack documents flagged at the chosen thresholds
+
+BN_native scores here leave each document's own seed family out of the attack KB (the KB is built from these same phase-1 payloads).
 
 | Detector | BL | EN | NT | TR |
 |---|---|---|---|---|
 | L2ext | 0/16 (0.0%) | 0/16 (0.0%) | 0/8 (0.0%) | 0/16 (0.0%) |
 | L2b | 0/16 (0.0%) | 1/16 (6.2%) | 0/8 (0.0%) | 0/16 (0.0%) |
-| BN_native | 14/16 (87.5%) | 0/16 (0.0%) | 6/8 (75.0%) | 14/16 (87.5%) |
+| L3 | 13/16 (81.2%) | 4/16 (25.0%) | 2/8 (25.0%) | 7/16 (43.8%) |
+| BN_native | 3/16 (18.8%) | 0/16 (0.0%) | 2/8 (25.0%) | 3/16 (18.8%) |
 
 Current `narrative_match_threshold` in config/thresholds.yaml: 0.42. Calibrated: 0.6149.
