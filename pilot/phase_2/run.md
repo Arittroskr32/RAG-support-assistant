@@ -42,7 +42,7 @@ ollama pull qwen3:4b
 # E5 downloads by itself the first time it is used; to fetch it now:
 python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('intfloat/multilingual-e5-small')"
 
-python -m pytest -q pilot/phase_2/tests                   # expect: 35 passed
+python -m pytest -q pilot/phase_2/tests                   # expect: 36 passed
 ```
 
 If the tests do not all pass, stop and send the output; nothing below will be trustworthy.
@@ -135,6 +135,9 @@ See `pilot/phase_2/data/README.md` for the exact formats. Write by hand (or edit
   (`"gold_source": "benign_docs/bn/<file>.md"`) once you have written them.
 * `pilot/phase_2/data/direct_injection.jsonl`: direct attacks and benign prompts for RQ1, with
   seed families that are not in KB-2.
+  Easiest in Excel: fill `pilot/phase_2/data/direct_injection.csv` (one row per attack family, with
+  `en`, `bn` and `banglish` columns; 45 benign prompts are already in it), save as CSV UTF-8, then
+  `python -m pilot.phase_2.make_direct` checks it and writes the `.jsonl`.
 
 ---
 
