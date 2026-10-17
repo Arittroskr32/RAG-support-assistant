@@ -133,6 +133,13 @@ def test_generate2_sends_seed_and_think_and_falls_back(monkeypatch):
     g = common2.generate2("ollama", "qwen3:4b", "s", "u", seed=7, think=False)
     assert calls[0]["options"]["seed"] == 7 and calls[0]["think"] is False
     assert "think" not in calls[1] and g["think_sent"] is None and g["text"] == "ok" and g["seed_sent"] == 7
+    assert calls[0]["messages"][1]["content"].endswith("/no_think")
+
+
+def test_strip_think_handles_a_missing_opening_tag():
+    from pilot.phase_2 import common2
+    assert common2.strip_think("Okay, let's think.\nStill thinking.\n</think>\n\nThe answer.") == "The answer."
+    assert common2.strip_think("<think>a</think>b") == "b" and common2.strip_think("plain") == "plain"
 
 
 def _fake_generate(model_follows=True):

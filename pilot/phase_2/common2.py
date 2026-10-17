@@ -52,6 +52,15 @@ REQUIRED = ["item_id", "seed_family", "group", "language", "technique", "goal_ty
 _THINK = re.compile(r"<think>.*?</think>\s*", re.DOTALL | re.IGNORECASE)
 
 
+def strip_think(text: str) -> str:
+    """Remove Qwen3 reasoning: whole <think> blocks, and everything before a stray </think>
+    (Ollama can return the reasoning without the opening tag)."""
+    text = _THINK.sub("", text or "")
+    if re.search(r"</think>", text, re.IGNORECASE):
+        text = re.split(r"</think>\s*", text, flags=re.IGNORECASE)[-1]
+    return text
+
+
 # --------------------------------------------------------------------------- items
 
 def need(path: str | Path, what: str) -> None:
@@ -133,7 +142,7 @@ def real_prompt(item: dict, l6: bool = True):
 def postprocess(text: str, ctx=None) -> tuple[str, int]:
     """What L7 does to a raw model answer: drop <think> blocks and echoed context tags."""
     from generation import l7_generation as l7
-    text = _THINK.sub("", text or "")
+    text = strip_think(text)
     echoed = 0
     if ctx is not None and ctx.tagged:
         text, echoed = l7.strip_echoed_context(text, ctx.nonce)
@@ -182,6 +191,10 @@ def generate2(backend: str, model: str, system: str, user: str, *, seed: int | N
             body["options"]["seed"] = seed
         if think is not None:
             body["think"] = think
+        if think is False and model.lower().startswith("qwen3"):
+            # Some Ollama versions accept "think": false and still let Qwen3 reason; its own
+            # soft switch turns reasoning off whatever the server does with the flag.
+            body["messages"][1]["content"] = user + "\n/no_think"
         t0 = time.perf_counter()
         r = _post(f"{root}/api/chat", timeout=timeout, retry_timeouts=retry_timeouts, json=body)
         think_sent = think
@@ -192,7 +205,7 @@ def generate2(backend: str, model: str, system: str, user: str, *, seed: int | N
         if r.status_code != 200:
             raise GenerationError(f"HTTP {r.status_code}: {r.text[:300]}")
         j = r.json()
-        return {"text": _THINK.sub("", j["message"].get("content") or ""),
+        return {"text": strip_think(j["message"].get("content") or ""),
                 "finish": {"length": "length"}.get(j.get("done_reason", ""), j.get("done_reason") or "stop"),
                 "prompt_tokens": j.get("prompt_eval_count"), "completion_tokens": j.get("eval_count"),
                 "latency_s": time.perf_counter() - t0, "temperature_sent": True,
