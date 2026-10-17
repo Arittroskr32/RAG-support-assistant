@@ -410,7 +410,8 @@ def test_calibrate_end_to_end(built_kb4, fake_e5, tmp_path):
     res = json.loads((tmp_path / "calibration.json").read_text())
     assert "bn_native" in res["chosen"] and "narrative_match_threshold" in res["chosen"]
     assert res["n_benign_chunks"] == {"en": 1, "bn": 1, "banglish": 1}
-    assert "leave each document's own seed family out" in (tmp_path / "calibration.md").read_text()
+    md = (tmp_path / "calibration.md").read_text()
+    assert "leave each document's own seed family out" in md and "chunked like ingestion does" in md
 
 
 def test_retrieval_eval(built_kb4, fake_e5, tmp_path, monkeypatch):

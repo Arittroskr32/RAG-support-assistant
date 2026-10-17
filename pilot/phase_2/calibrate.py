@@ -148,7 +148,23 @@ def main(argv=None) -> None:
         for i in attacks:
             fam_payloads[i.get("seed_family")].add(i.get("payload", "").strip())
         lofo = [fam_payloads[i.get("seed_family")] for i in attacks]
-    a_scores = score_all([i["carrier_doc"] for i in attacks], exclude=lofo)
+    # Ingestion scans chunks, and the thresholds were picked on benign chunks, so attack documents are
+    # chunked the same way; a document counts as flagged when any of its chunks is.
+    from ingestion.chunkers import chunk_document
+    a_chunks, owner = [], []
+    for k, i in enumerate(attacks):
+        for c in chunk_document(i["carrier_doc"], "product_info", i["item_id"]) or [i["carrier_doc"]]:
+            a_chunks.append(c)
+            owner.append(k)
+    c_scores = score_all(a_chunks, exclude=None if lofo is None else [lofo[o] for o in owner])
+    a_scores = {}
+    for det, vals in c_scores.items():
+        per_doc = [[] for _ in attacks]
+        for o, v in zip(owner, vals):
+            if v is not None:
+                per_doc[o].append(v)
+        pick = min if det == "L2b" else max          # L2b flags low scores, the others high scores / True
+        a_scores[det] = [pick(v) if v else None for v in per_doc]
     a_groups = [group_code(i) for i in attacks]
 
     targets = [a.target] + [t for t in a.target_extra if t != a.target]
@@ -192,7 +208,8 @@ def main(argv=None) -> None:
                 rate([f for f, lang in zip(b_scores[det], langs) if lang == L]) for L in LANGS) + " |")
 
     # attacks at the chosen thresholds
-    md += ["", "## Attack documents flagged at the chosen thresholds", ""]
+    md += ["", "## Attack documents flagged at the chosen thresholds", "",
+           "Each document is chunked like ingestion does; it counts as flagged when any chunk is.", ""]
     if lofo is not None:
         md += ["BN_native scores here leave each document's own seed family out of the attack KB "
                "(the KB is built from these same phase-1 payloads).", ""]
