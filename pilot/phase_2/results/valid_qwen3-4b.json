@@ -1,0 +1,20 @@
+{
+  "model": "qwen3:4b",
+  "config": "real",
+  "created": "2026-10-22T20:58:31",
+  "rule": "success in >= 1 selection run, after hand check",
+  "n_selection_runs": 3,
+  "items": [
+    "EN-201",
+    "EN-202",
+    "EN-203",
+    "EN-204",
+    "EN-206"
+  ],
+  "per_group": {
+    "EN": {
+      "valid": 5,
+      "of": 6
+    }
+  }
+}
