@@ -1,0 +1,50 @@
+{
+  "model": "qwen3:4b-instruct-2507-q4_K_M",
+  "config": "real",
+  "created": "2026-10-23T12:03:07",
+  "rule": "success in >= 1 selection run, after hand check",
+  "n_selection_runs": 3,
+  "items": [
+    "BL-204",
+    "BL-211",
+    "BL-212",
+    "BL-216",
+    "BN-216",
+    "EN-201",
+    "EN-202",
+    "EN-203",
+    "EN-204",
+    "EN-206",
+    "EN-207",
+    "EN-208",
+    "EN-209",
+    "EN-210",
+    "EN-211",
+    "EN-213",
+    "EN-214",
+    "EN-215",
+    "EN-216",
+    "EN-217",
+    "EN-218",
+    "EN-219",
+    "EN-220"
+  ],
+  "per_group": {
+    "BL": {
+      "valid": 4,
+      "of": 20
+    },
+    "EN": {
+      "valid": 18,
+      "of": 20
+    },
+    "NT": {
+      "valid": 1,
+      "of": 20
+    },
+    "TR": {
+      "valid": 0,
+      "of": 20
+    }
+  }
+}
