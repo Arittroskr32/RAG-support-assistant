@@ -1,6 +1,7 @@
 # Phase 2 extension: run order
 
-Run everything from the repository root, on the same machine and setup as phase 2 (Ollama, the GPU, the
+The commands work in bash and zsh. Every variable holds a single word, because zsh does not split a
+variable into several arguments. Run everything from the repository root, on the same machine and setup as phase 2 (Ollama, the GPU, the
 fine-tuned L3 adapter, `multilingual-e5-small`). Start with `git pull`. Every step writes to
 `pilot/phase_2_extension/results/`. Times are rough, taken from the phase-2 runs on the same laptop.
 
@@ -44,11 +45,13 @@ python -m pilot.phase_2_extension.rq1_chunks                 # RQ1: L3 x E5_all 
 Selection seeds, real prompt, 3 runs, same as phase 2. They all write to one file.
 
 ```bash
-G="--out $X/results/generations_ext.jsonl --phase selection --runs 3"
 for M in llama3.2:3b $QWEN; do
-  python -m pilot.phase_2.run_generation --model $M --items $X/results/crossed_items.jsonl $G       # 80 items, ~1 h per model
-  for S in policy content reworded; do
-    python -m pilot.phase_2.run_generation --model $M --items $X/results/paraphrase_items_$S.jsonl $G   # 9 items each
+  # 80 items, ~1 h per model
+  python -m pilot.phase_2.run_generation --model $M --items $X/results/crossed_items.jsonl \
+      --out $X/results/generations_ext.jsonl --phase selection --runs 3
+  for S in policy content reworded; do      # 9 items each
+    python -m pilot.phase_2.run_generation --model $M --items $X/results/paraphrase_items_$S.jsonl \
+        --out $X/results/generations_ext.jsonl --phase selection --runs 3
   done
 done
 python -m pilot.phase_1.hand_check --gen $X/results/generations_ext.jsonl   # hand-check every hit, as in phase 2
