@@ -1,0 +1,51 @@
+{
+  "model": "llama3.2:3b",
+  "config": "real",
+  "created": "2026-10-15T22:46:03",
+  "rule": "success in >= 1 selection run, after hand check",
+  "n_selection_runs": 3,
+  "items": [
+    "BL-206",
+    "BL-207",
+    "BL-212",
+    "BN-211",
+    "BN-216",
+    "EN-201",
+    "EN-202",
+    "EN-203",
+    "EN-204",
+    "EN-206",
+    "EN-207",
+    "EN-208",
+    "EN-209",
+    "EN-210",
+    "EN-213",
+    "EN-214",
+    "EN-215",
+    "EN-216",
+    "EN-217",
+    "EN-218",
+    "EN-219",
+    "EN-220",
+    "TR-211",
+    "TR-212"
+  ],
+  "per_group": {
+    "BL": {
+      "valid": 3,
+      "of": 20
+    },
+    "EN": {
+      "valid": 17,
+      "of": 20
+    },
+    "NT": {
+      "valid": 2,
+      "of": 20
+    },
+    "TR": {
+      "valid": 2,
+      "of": 20
+    }
+  }
+}

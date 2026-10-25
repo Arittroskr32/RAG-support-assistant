@@ -1,0 +1,30 @@
+{
+  "target_fqr": 0.02,
+  "e5_prefix": "standard",
+  "n_benign_chunks": {
+    "en": 102,
+    "bn": 102,
+    "banglish": 102
+  },
+  "n_attacks": 56,
+  "attacks_file": "/mnt/E/4100 - Thesis/RAG-support-assistant/pilot/phase_1/pilot_items.jsonl",
+  "current": {
+    "L2b": 0.42
+  },
+  "thresholds": {
+    "L2b": {
+      "0.02": 0.6149,
+      "0.05": 0.6422
+    },
+    "BN_native": {
+      "0.02": 0.8922,
+      "0.05": 0.886
+    }
+  },
+  "chosen": {
+    "narrative_match_threshold": 0.6149,
+    "bn_native": 0.8922
+  },
+  "warnings": [],
+  "benign_scores_file": "calibration_benign_scores.jsonl"
+}
