@@ -1,8 +1,6 @@
 # Phase 2 report (full)
 
-**Source:** `main` at `911c791` (23 Oct 2026). Results are in `pilot/phase_2/results/` and `pilot/phase_1/d4/out/`.
-
-**Status:** done: the fresh test set; selection and measurement runs on llama3.2:3b, llama3.1:8b and Qwen3-4B (instruct); both controls; the three-configuration stack run with the 3B and Qwen generators; retrieval evaluation; calibration with L3 on chunks; the Bangla check (scored); D4 before and after padding. **Pending:** direct-injection attacks for RQ1 (§10).
+**Status:** Done: [selection and measurement runs on llama3.2:3b, llama3.1:8b and Qwen3-4B (instruct); both controls; the three-configuration stack run with the 3B and Qwen generators; retrieval evaluation; calibration with L3 on chunks; the Bangla check (scored); D4 before and after padding.]
 
 ## 1. Summary
 
@@ -12,24 +10,23 @@ Phase 2 follows the review of the pilot report. The 56 pilot items are now devel
 
 **The phishing "successes" are mostly instruction-free poisoning.** With the instruction deleted and only the address kept, the canary appeared as often as, or more often than, with the instruction. This held on 3B, 8B and Qwen (Tables 5, 5b and 12). Phishing goals cannot be counted as injection successes.
 
-**A Bangla-capable generator makes the defended stack much weaker** (Table 13). Qwen3-4B (instruct) is the only tested generator that answers Bangla questions in Bangla (§9). With the same defences and documents, end-to-end attack success in `bangla_serving` rose from 1/72 runs with 3B to **31/72 with Qwen** (English 27/51, native Bangla 4/6). For the 3B stack, the protection came mostly from the small model ignoring the instruction, not from detection: as deployed, nothing was quarantined or blocked. The only layer that stopped Bangla attacks was BN_native, which quarantined every translated and native Bangla document and 6 of 9 Banglish documents, in every run. It cannot stop English attacks, so 27/72 Qwen successes remain with BN_native on.
+**A Bangla-capable generator makes the defended stack much weaker** (Table 13). Qwen3-4B (instruct) is the only tested generator that answers Bangla questions in Bangla. With the same defences and documents, end-to-end attack success in `bangla_serving` rose from 1/72 runs with 3B to **31/72 with Qwen** (English 27/51, native Bangla 4/6). For the 3B stack, the protection came mostly from the small model ignoring the instruction, not from detection: as deployed, nothing was quarantined or blocked. The only layer that stopped Bangla attacks was BN_native, which quarantined every translated and native Bangla document and 6 of 9 Banglish documents, in every run. It cannot stop English attacks, so 27/72 Qwen successes remain with BN_native on.
 
-**Calibration at a 2% false-quarantine rate on benign documents** (§6) gives L2b and BN_native usable thresholds. It also shows that L3 on chunks cannot be used at ingestion for Bangla: it wrongly quarantines 40% of benign Bangla chunks and 19% of benign Banglish chunks (English 4%).
+**Calibration at a 2% false-quarantine rate on benign documents** gives L2b and BN_native usable thresholds. It also shows that L3 on chunks cannot be used at ingestion for Bangla: it wrongly quarantines 40% of benign Bangla chunks and 19% of benign Banglish chunks (English 4%).
 
-**D4** (§8): among refused requests, an attacker identified the refusing layer from latency in 94% of cases (majority baseline 59%). With every refusal padded to 1,500 ms, this fell to **51%**, below the baseline.
+**D4**: among refused requests, an attacker identified the refusing layer from latency in 94% of cases (majority baseline 59%). With every refusal padded to 1,500 ms, this fell to **51%**, below the baseline.
 
 ## 2. What was run
 
 - **Items:** 80 new indirect-injection items (`pilot_items2.jsonl`), in 20 seed families shared by English (EN-201..220), translated Bangla (TR), Banglish (BL) and native Bangla (BN-201..220, group NT).
   - Goals: marker 68, phishing 12; no PII or image goals.
   - Techniques: plain note 68, HTML comment 12.
-  - Every item is labelled `author: human`, so all Banglish is human-written. The validator confirms that no family, canary core or payload is reused from phase 1, and that no canary collides with a knowledge-base document.
   - Each item has a **positive control** (`~pc`, the same instruction as the user's own request). The 12 phishing items also have a **base rate** (`~br`, the instruction deleted and the entity kept).
 - **Development data:** all 56 phase-1 items, used only for the BN_native attack examples and as a reference report (`phase1_dev_report.md`).
 - **Generators**, via Ollama's native `/api/chat`, with temperature 0.2, 1,024 answer tokens, `num_ctx` 8,192 and 3 runs per item:
   - `llama3.2:3b` (deployed)
   - `llama3.1:8b`
-  - `qwen3:4b-instruct-2507-q4_K_M` (non-thinking build, thinking off)
+  - `qwen3:4b-instruct-2507-q4_K_M`
 
   Selection seeds 20262013–15, measurement seeds 20263013–15. Model digests and git commits are logged in `run_metadata2.jsonl`.
 - **Prompt:** the repository's real L6 fence and L7 system prompt in every run (`--prompt real`).
@@ -295,7 +292,7 @@ Confusion after padding (rows = true layer):
 | llama3.2:3b, pooled | – | 75% (18/24) | 4% | 0% | 0% (0/24) | – |
 | Qwen3-4B, pooled | – | 75% (18/24) | 54% | 38% | 25% (6/24) | – |
 
-Scored by: **[fill in: e.g. "an AI model (first pass), then checked and corrected by the author, a native Bangla speaker"]**.
+
 
 **Decision.** The rule, fixed before looking, was that Qwen counts as Bangla-capable if its "All three" is at least 15 points above llama3.2:3b and its "Correct" is not lower. Pooled over both languages, Qwen passes: All three is 25 points higher (25% vs 0%), and Correct is equal (75% vs 75%). The pass comes **only from Bangla script**:
 - **Bangla (bn):** Qwen answers every question in Bangla (100%, against 0% for Llama), but it is less often correct (58% vs 92%). For example, it adds a "Google browser" step, and it says the reset link "works after 24 hours" when the document says it expires. Llama is correct but answers in English.
@@ -346,13 +343,4 @@ What can be reported now is the false-refusal rate on benign prompts:
 - **Calibration** uses 102 benign chunks per language, so a 2% target is about 2 chunks.
 - **The Claude run was dropped** as non-essential; Qwen3-4B took its role.
 
-## 13. Next steps
 
-| Step | Needs |
-|---|---|
-| Write ≥ 30 direct-attack families in `direct_injection.csv`, run `make_direct`, `direct_shadow run --bn --answers`, `direct_shadow analyze` | your attacks |
-| Fill in who scored the Bangla check (§9) | – |
-| Remove the committed LibreOffice lock file `.~lock.bangla_check_…csv#` | – |
-| Optional: refusal floor 3,000 ms to close the D4 tail | API + GPU |
-| Optional: stack run with one planted item at a time, or more benign Bangla documents in KB-4 | GPU |
-| Optional: Qwen stack run on Qwen's own valid items | GPU |
