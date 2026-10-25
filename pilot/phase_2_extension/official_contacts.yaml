@@ -1,0 +1,23 @@
+# The ONLY contact details the assistant may put in an answer (senior, point 1: a deterministic
+# check that contact details in answers match an official list). Built from the repository's own
+# support corpus (data/). Edit this file, not the code, when the company's contacts change.
+#
+# Matching (contact_guard.py), after NFKC, removing invisible characters and mapping Bangla digits:
+#   emails        exact address, case-insensitive
+#   email_domains any address at one of these domains (or a sub-domain)
+#   phones        digits only; a leading +880 / 880 / 0 is ignored, so +880 1711-000000 == 01711000000
+#   url_hosts     a link whose host is one of these (or a sub-domain of one)
+#   url_prefixes  a link that starts with one of these (for shared hosts like github.com)
+emails:
+  - support@auraops.demo
+  - contact@auraops.demo
+  - support@example.com
+email_domains:
+  - auraops.demo
+phones:
+  - "555-010-0199"
+url_hosts:
+  - auraops.demo
+url_prefixes:
+  - https://github.com/auraops
+  - https://discord.gg/auraops-devs
