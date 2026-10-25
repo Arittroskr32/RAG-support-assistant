@@ -106,3 +106,20 @@ Then send me the results folder, or push it, and I will write the extension sect
 ## Total
 
 Steps 2–6 take about one to one and a half days of GPU time on the laptop. The native-Bangla stack questions are the slow part (median 2.5 minutes each on 3B). If time is short, run step 2, the Qwen part of step 5 and step 6 first. They answer the senior's three main points.
+
+## 8. Follow-ups after the first results (25 Oct)
+
+```bash
+pip install statsmodels                                       # CMH in rq1_chunks
+python -m pilot.phase_2_extension.rq1_chunks                  # rerun with CMH (product chunking)
+
+# Chunking check (stop the API first). The stack splits the planted note so the payload is its own
+# chunk (kb4); `joined` glues it to the carrier text. Each mode writes to results/chunking_<mode>/.
+for C in kb4 joined; do
+  python -m pilot.phase_2_extension.detectors_all --chunking $C              # CPU, ~5 min
+done
+# RQ1 with L3 on the kb4 chunks (GPU, ~30-60 min), then the pair table
+python -m pilot.phase_2_extension.detectors_all --chunking kb4 --with-l3
+python -m pilot.phase_2_extension.rq1_chunks --long $X/results/chunking_kb4/detectors_long.csv \
+    --out $X/results/chunking_kb4/rq1_chunks.md
+```

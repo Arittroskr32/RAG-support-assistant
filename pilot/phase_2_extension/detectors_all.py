@@ -72,9 +72,26 @@ def load_docs(all_items: Path, results: Path) -> list[dict]:
     return docs
 
 
-def chunks_of(text: str, doc_id: str) -> list[str]:
+CHUNKING = ("product", "kb4", "joined")
+
+
+def chunks_of(text: str, doc_id: str, mode: str = "product") -> list[str]:
+    """product: split by markdown heading (how this script ran first; the payload stays with its paragraph).
+    kb4:     exactly how the stack ingests a planted note (data/public_faq, title "Support note"): the FAQ
+             chunker splits at blank lines, so the payload usually becomes a chunk of its own.
+    joined:  kb4, but with the blank lines removed first, so the payload is glued to the carrier text
+             (what an attacker does to dilute the payload's score)."""
     from ingestion.chunkers import chunk_document
-    return [c for c in (chunk_document(text, "product_info", doc_id) or [text]) if c.strip()]
+    if mode == "product":
+        raw = chunk_document(text, "product_info", doc_id)
+    elif mode == "kb4":
+        raw = chunk_document(text, "public_faq", "Support note")
+    elif mode == "joined":
+        import re
+        raw = chunk_document(re.sub(r"\n\s*\n", "\n", text), "public_faq", "Support note")
+    else:
+        raise ValueError(f"unknown chunking mode {mode!r}")
+    return [c for c in (raw or [text]) if c.strip()]
 
 
 def strict_threshold(benign_scores: dict[str, list[float]], target: float) -> tuple[float, dict]:
@@ -107,7 +124,10 @@ def main(argv=None) -> None:
     ap.add_argument("--with-l3", action="store_true")
     ap.add_argument("--no-e5", action="store_true", help="skip the E5 detectors (no model available)")
     ap.add_argument("--e5-extra", help="extra attack examples for E5_all (JSONL with 'text')")
-    ap.add_argument("--out-dir", default=str(RESULTS))
+    ap.add_argument("--chunking", choices=CHUNKING, default="product",
+                    help="how attack documents are chunked (see chunks_of); non-default modes write to "
+                         "results/chunking_<mode>/ so the main results are not overwritten")
+    ap.add_argument("--out-dir", default=None, help="default: results/ (product) or results/chunking_<mode>/")
     a = ap.parse_args(argv)
 
     from pilot.phase_1 import layers
@@ -115,19 +135,20 @@ def main(argv=None) -> None:
     from pilot.phase_2.calibrate import load_benign
     from pilot.phase_2.common2 import DATA2_DIR
 
-    out = Path(a.out_dir)
+    load_dir = Path(a.out_dir) if a.out_dir else RESULTS        # where paraphrase/crossed items live
+    out = Path(a.out_dir) if a.out_dir else (RESULTS if a.chunking == "product" else RESULTS / f"chunking_{a.chunking}")
     out.mkdir(parents=True, exist_ok=True)
     cal = json.loads(Path(a.calibration).read_text(encoding="utf-8"))
     l2b_thr = cal["chosen"]["narrative_match_threshold"]
     bn_thr = cal["chosen"]["bn_native"]
-    docs = load_docs(Path(a.items), out)
+    docs = load_docs(Path(a.items), load_dir)
     benign = load_benign(Path(a.benign_dir or DATA2_DIR / "benign_docs"), include_repo_data=False)
     test_payloads = {d.get("payload", "").strip() for d in docs if d["set"] in ("attack", "paraphrase", "crossed")}
 
     # chunk every document once
     d_chunks, owner = [], []
     for k, d in enumerate(docs):
-        for c in chunks_of(d["carrier_doc"], d["item_id"]):
+        for c in chunks_of(d["carrier_doc"], d["item_id"], a.chunking):
             d_chunks.append(c)
             owner.append(k)
     b_texts = [c["text"] for c in benign]
@@ -205,6 +226,7 @@ def main(argv=None) -> None:
 
     # ------------------------------------------------------------------ report
     md = ["# Chunk detectors on every phase-2 document", "",
+          f"Chunking of attack documents: `{a.chunking}` (see `chunks_of`).", "",
           f"Thresholds: L2b {l2b_thr} and BN_native {bn_thr} from `{Path(a.calibration).name}` (phase 2); "
           + (f"E5_all {thresholds['E5_all']} (strictest per-language threshold at {a.target:.0%}: "
              f"{thresholds['E5_all_per_language']}; attack KB {thresholds['E5_all_kb_size']} phase-1 payloads, "
