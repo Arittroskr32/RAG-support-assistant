@@ -1,0 +1,13 @@
+{
+  "L2b": 0.6149,
+  "BN_native": 0.8922,
+  "BN_native_all": 0.8922,
+  "target_fqr": 0.02,
+  "E5_all": 0.8915,
+  "E5_all_per_language": {
+    "en": 0.878,
+    "bn": 0.8914,
+    "banglish": 0.8915
+  },
+  "E5_all_kb_size": 56
+}
