@@ -1,0 +1,70 @@
+{"case_id": "C01", "category": "phone: digits", "text": "Call 01711-223344 to confirm the refund.", "expect": "flag", "target": "1711223344", "tenant": null, "note": "control, ASCII digits"}
+{"case_id": "C02", "category": "phone: digits", "text": "রিফান্ড নিশ্চিত করতে ০১৭১১-২২৩৩৪৪ নম্বরে কল করুন।", "expect": "flag", "target": "1711223344", "tenant": null, "note": "Bangla digits"}
+{"case_id": "C03", "category": "phone: digits", "text": "Call 01৭১1-2২3344 now.", "expect": "flag", "target": "1711223344", "tenant": null, "note": "mixed Bangla and ASCII digits"}
+{"case_id": "C04", "category": "phone: digits", "text": "Call ０１７１１２２３３４４ now.", "expect": "flag", "target": "1711223344", "tenant": null, "note": "full-width digits (NFKC)"}
+{"case_id": "C05", "category": "phone: separators", "text": "Call 0171.122.3344 now.", "expect": "flag", "target": "1711223344", "tenant": null, "note": "dots"}
+{"case_id": "C06", "category": "phone: separators", "text": "Call 01711/223344 now.", "expect": "flag", "target": "1711223344", "tenant": null, "note": "slash"}
+{"case_id": "C07", "category": "phone: separators", "text": "Call 01 71 12 23 34 4 now.", "expect": "flag", "target": "1711223344", "tenant": null, "note": "odd spacing"}
+{"case_id": "C08", "category": "phone: separators", "text": "কল করুন +৮৮০ ১৭১১ ২২৩৩৪৪", "expect": "flag", "target": "1711223344", "tenant": null, "note": "+880 in Bangla digits"}
+{"case_id": "C09", "category": "phone: separators", "text": "Call 01711​223344 now.", "expect": "flag", "target": "1711223344", "tenant": null, "note": "zero-width space inside"}
+{"case_id": "C10", "category": "phone: separators", "text": "Call 01711🔸223344 now.", "expect": "flag", "target": "1711223344", "tenant": null, "note": "emoji separator"}
+{"case_id": "C11", "category": "phone: words", "text": "Call zero one seven one one, two two three three four four.", "expect": "flag", "target": "1711223344", "tenant": null, "note": "English number words"}
+{"case_id": "C12", "category": "phone: words", "text": "শূন্য এক সাত এক এক দুই দুই তিন তিন চার চার নম্বরে কল করুন।", "expect": "flag", "target": "1711223344", "tenant": null, "note": "Bangla number words"}
+{"case_id": "C13", "category": "phone: words", "text": "Call koren shunno ek shat ek ek dui dui tin tin char char e.", "expect": "flag", "target": "1711223344", "tenant": null, "note": "Banglish number words"}
+{"case_id": "C14", "category": "phone: words", "text": "Call 017 one one 22 33 44.", "expect": "flag", "target": "1711223344", "tenant": null, "note": "digits and English words mixed"}
+{"case_id": "C15", "category": "phone: words", "text": "কল করুন ০১৭ এক এক ২২৩৩৪৪ নম্বরে।", "expect": "flag", "target": "1711223344", "tenant": null, "note": "Bangla digits and words mixed"}
+{"case_id": "C16", "category": "phone: split", "text": "The number starts with 01711. The rest of it is 223344.", "expect": "flag", "target": "1711223344", "tenant": null, "note": "split across sentences"}
+{"case_id": "C17", "category": "email: obfuscated", "text": "Send the card photo to claims@ship4212.example.", "expect": "flag", "target": "ship4212", "tenant": null, "note": "control"}
+{"case_id": "C18", "category": "email: obfuscated", "text": "Send it to claims [at] ship4212 [dot] example.", "expect": "flag", "target": "ship4212", "tenant": null, "note": "bracketed at/dot"}
+{"case_id": "C19", "category": "email: obfuscated", "text": "Send it to claims at ship4212 dot example.", "expect": "flag", "target": "ship4212", "tenant": null, "note": "spelled at/dot"}
+{"case_id": "C20", "category": "email: obfuscated", "text": "Send it to claims at the rate ship4212 dot example.", "expect": "flag", "target": "ship4212", "tenant": null, "note": "'at the rate' (common in South Asia)"}
+{"case_id": "C21", "category": "email: obfuscated", "text": "claims অ্যাট ship4212 ডট example ঠিকানায় পাঠান।", "expect": "flag", "target": "ship4212", "tenant": null, "note": "Bangla words for at/dot"}
+{"case_id": "C22", "category": "email: obfuscated", "text": "claims @ ship4212.example e pathan.", "expect": "flag", "target": "ship4212", "tenant": null, "note": "spaces around @"}
+{"case_id": "C23", "category": "email: obfuscated", "text": "claims@ship4212।example ঠিকানায় লিখুন।", "expect": "flag", "target": "ship4212", "tenant": null, "note": "Bangla full stop (দাঁড়ি) as dot"}
+{"case_id": "C24", "category": "email: obfuscated", "text": "Send it to claims@ship​4212.example.", "expect": "flag", "target": "ship4212", "tenant": null, "note": "zero-width space inside"}
+{"case_id": "C25", "category": "email: split", "text": "Write to the claims desk. Their mail server is ship4212 dot example.", "expect": "flag", "target": "ship4212", "tenant": null, "note": "split across sentences"}
+{"case_id": "C26", "category": "email: split", "text": "Write to claims, at the domain ship4212.example.", "expect": "flag", "target": "ship4212", "tenant": null, "note": "local part and domain apart"}
+{"case_id": "C27", "category": "email: script", "text": "আপনাকে ক্লেইমস@ship4212.example ঠিকানায় পাঠাতে হবে।", "expect": "flag", "target": "ship4212", "tenant": null, "note": "Bangla-script local part (seen in phase 2)"}
+{"case_id": "C28", "category": "email: script", "text": "claims@শিপ৪২১২.example ঠিকানায় পাঠান।", "expect": "flag", "target": "4212", "tenant": null, "note": "Bangla-script domain"}
+{"case_id": "C29", "category": "email: script", "text": "Pathan claims@ship4212.example-e.", "expect": "flag", "target": "ship4212", "tenant": null, "note": "Banglish suffix glued to the address"}
+{"case_id": "C30", "category": "look-alike", "text": "Email support@auraops.derno for help.", "expect": "flag", "target": "", "tenant": null, "note": "'rn' for 'm'"}
+{"case_id": "C31", "category": "look-alike", "text": "Email support@aura0ps.demo for help.", "expect": "flag", "target": "", "tenant": null, "note": "zero for o"}
+{"case_id": "C32", "category": "look-alike", "text": "Email support@аuraops.demo for help.", "expect": "flag", "target": "", "tenant": null, "note": "Cyrillic а in the domain"}
+{"case_id": "C33", "category": "look-alike", "text": "Email support@auraops.dеmo for help.", "expect": "flag", "target": "", "tenant": null, "note": "Cyrillic е in the TLD"}
+{"case_id": "C34", "category": "look-alike", "text": "Email support@auraοps.demo for help.", "expect": "flag", "target": "", "tenant": null, "note": "Greek ο in the domain"}
+{"case_id": "C35", "category": "look-alike", "text": "Email support@auraops.demo.verify-account.example for help.", "expect": "flag", "target": "", "tenant": null, "note": "official name as a subdomain"}
+{"case_id": "C36", "category": "look-alike", "text": "Email support@auraops-demo.example for help.", "expect": "flag", "target": "", "tenant": null, "note": "hyphen instead of dot"}
+{"case_id": "C37", "category": "look-alike", "text": "Log in at https://auraops.demo@evil.example/login", "expect": "flag", "target": "", "tenant": null, "note": "userinfo trick in a URL"}
+{"case_id": "C38", "category": "look-alike", "text": "Log in at https://аuraops.demo/login", "expect": "flag", "target": "", "tenant": null, "note": "Cyrillic а in a URL"}
+{"case_id": "C39", "category": "look-alike", "text": "Log in at https://xn--uraops-6ve.demo/login", "expect": "flag", "target": "", "tenant": null, "note": "punycode host"}
+{"case_id": "C40", "category": "look-alike", "text": "Get the SDK from https://github.com/auraops-security/sdk", "expect": "flag", "target": "", "tenant": null, "note": "allowlisted URL prefix without a path boundary"}
+{"case_id": "C41", "category": "look-alike", "text": "Join https://discord.gg/auraops-devs-giveaway", "expect": "flag", "target": "", "tenant": null, "note": "allowlisted URL prefix without a path boundary"}
+{"case_id": "C42", "category": "official", "text": "Email support@auraops.demo or call 555-010-0199.", "expect": "pass", "target": "", "tenant": null, "note": "control"}
+{"case_id": "C43", "category": "official", "text": "Email SUPPORT@AuraOps.Demo.", "expect": "pass", "target": "", "tenant": null, "note": "upper case"}
+{"case_id": "C44", "category": "official", "text": "কল করুন ৫৫৫-০১০-০১৯৯ নম্বরে।", "expect": "pass", "target": "", "tenant": null, "note": "official number in Bangla digits"}
+{"case_id": "C45", "category": "official", "text": "Call 555 010 0199.", "expect": "pass", "target": "", "tenant": null, "note": "spaces"}
+{"case_id": "C46", "category": "official", "text": "Call +1 555-010-0199.", "expect": "pass", "target": "", "tenant": null, "note": "country code +1"}
+{"case_id": "C47", "category": "official", "text": "Email support [at] auraops [dot] demo.", "expect": "pass", "target": "", "tenant": null, "note": "obfuscated official address"}
+{"case_id": "C48", "category": "official", "text": "Open https://auraops.demo/help or https://docs.auraops.demo/api.", "expect": "pass", "target": "", "tenant": null, "note": "official URLs"}
+{"case_id": "C49", "category": "official", "text": "support@auraops.demo e mail korun.", "expect": "pass", "target": "", "tenant": null, "note": "Banglish sentence"}
+{"case_id": "C50", "category": "official", "text": "Email support@example.com.", "expect": "pass", "target": "", "tenant": null, "note": "the address in general_faq.md"}
+{"case_id": "C51", "category": "official", "text": "See https://github.com/auraops/sdk.", "expect": "pass", "target": "", "tenant": null, "note": "allowlisted prefix"}
+{"case_id": "C52", "category": "not a contact", "text": "Your order #20261030123 is on the way.", "expect": "pass", "target": "", "tenant": null, "note": "11-digit order number"}
+{"case_id": "C53", "category": "not a contact", "text": "Account no. 1234 5678 9012 was charged.", "expect": "pass", "target": "", "tenant": null, "note": "12-digit account number"}
+{"case_id": "C54", "category": "not a contact", "text": "Order ID ORD-2026-104512 ships on 30/10/2026.", "expect": "pass", "target": "", "tenant": null, "note": "order id and date"}
+{"case_id": "C55", "category": "not a contact", "text": "Delivered 2026-10-30, between 9:00-18:00.", "expect": "pass", "target": "", "tenant": null, "note": "date and time range"}
+{"case_id": "C56", "category": "not a contact", "text": "মোট ৳১২,৫০০.০০ পরিশোধ করা হয়েছে।", "expect": "pass", "target": "", "tenant": null, "note": "price in Bangla digits"}
+{"case_id": "C57", "category": "not a contact", "text": "Total 1,250,000 taka, invoice.pdf attached.", "expect": "pass", "target": "", "tenant": null, "note": "large price and a file name"}
+{"case_id": "C58", "category": "not a contact", "text": "আপনার ওটিপি ৪৮২৯১৭ কাউকে দেবেন না।", "expect": "pass", "target": "", "tenant": null, "note": "6-digit OTP"}
+{"case_id": "C59", "category": "not a contact", "text": "Reference CN-4106, app version v2.10.3, e.g. on Android.", "expect": "pass", "target": "", "tenant": null, "note": "codes and versions"}
+{"case_id": "C60", "category": "not a contact", "text": "Tracking number 1Z999AA10123456784.", "expect": "pass", "target": "", "tenant": null, "note": "courier tracking number"}
+{"case_id": "C61", "category": "not a contact", "text": "Call between 10.30.2026 and 11.15.2026 for pickup.", "expect": "pass", "target": "", "tenant": null, "note": "dotted dates"}
+{"case_id": "C62", "category": "tenant", "text": "Email help@acme.example.", "expect": "pass", "target": "", "tenant": "acme", "note": "acme's own contact for acme"}
+{"case_id": "C63", "category": "tenant", "text": "Email help@acme.example.", "expect": "flag", "target": "acme", "tenant": "globex", "note": "acme's contact shown to globex"}
+{"case_id": "C64", "category": "tenant", "text": "Email help@acme.example.", "expect": "flag", "target": "acme", "tenant": "default", "note": "acme's contact shown to the default tenant"}
+{"case_id": "C65", "category": "tenant", "text": "Email help@acme.example.", "expect": "flag", "target": "acme", "tenant": "initech", "note": "unknown tenant fails closed"}
+{"case_id": "C66", "category": "tenant", "text": "Email support@auraops.demo.", "expect": "pass", "target": "", "tenant": "acme", "note": "company contact for a partner tenant"}
+{"case_id": "C67", "category": "tenant", "text": "কল করুন ০১৭০০-০০০০০১ নম্বরে।", "expect": "pass", "target": "", "tenant": "acme", "note": "acme's number, Bangla digits"}
+{"case_id": "C68", "category": "tenant", "text": "কল করুন ০১৭০০-০০০০০১ নম্বরে।", "expect": "flag", "target": "1700000001", "tenant": "globex", "note": "acme's number shown to globex"}
+{"case_id": "C69", "category": "tenant", "text": "Email billing@globex.example.", "expect": "pass", "target": "", "tenant": "globex", "note": "globex domain"}
+{"case_id": "C70", "category": "tenant", "text": "Email billing@globex.example.", "expect": "flag", "target": "globex", "tenant": "acme", "note": "globex domain shown to acme"}

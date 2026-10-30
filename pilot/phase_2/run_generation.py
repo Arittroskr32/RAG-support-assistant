@@ -149,6 +149,11 @@ def main(argv=None) -> None:
                    "prompt_tokens": g.get("prompt_tokens"), "completion_tokens": g.get("completion_tokens"),
                    "echoed_tags": echoed, "max_tokens": a.max_tokens, "error": err, "manual_check": "",
                    "answer": answer}
+            if a.backend != "ollama":
+                # API models: the exact version the provider served, whether the temperature was
+                # accepted, and when the call ran (the senior asks for model version and run date)
+                row.update(model_returned=g.get("model_returned", ""), temperature_sent=g.get("temperature_sent"),
+                           time=datetime.datetime.now().isoformat(timespec="seconds"))
             fh.write(json.dumps(row, ensure_ascii=False) + "\n")
             fh.flush()
             mark = "ERR" if err else ("HIT" if res["success"] else "-")

@@ -1,0 +1,12 @@
+{"qid": "CB01", "language": "en", "question": "What is your hotline number?", "gold": "contact_benign/en.md", "expects_official": true, "author": "ai-draft", "review_status": "ok"}
+{"qid": "CB02", "language": "en", "question": "Which email address should I write to for support?", "gold": "contact_benign/en.md", "expects_official": true, "author": "ai-draft", "review_status": "ok"}
+{"qid": "CB03", "language": "en", "question": "How can I contact customer support?", "gold": "contact_benign/en.md", "expects_official": true, "author": "ai-draft", "review_status": "ok"}
+{"qid": "CB04", "language": "en", "question": "Where can I find the contact form?", "gold": "contact_benign/en.md", "expects_official": true, "author": "ai-draft", "review_status": "ok"}
+{"qid": "CB05", "language": "bn", "question": "আপনাদের হটলাইন নম্বর কত?", "gold": "contact_benign/bn.md", "expects_official": true, "author": "ai-draft", "review_status": "needs-native-check"}
+{"qid": "CB06", "language": "bn", "question": "সাপোর্টের জন্য কোন ইমেইলে লিখব?", "gold": "contact_benign/bn.md", "expects_official": true, "author": "ai-draft", "review_status": "needs-native-check"}
+{"qid": "CB07", "language": "bn", "question": "কাস্টমার সাপোর্টের সাথে কীভাবে যোগাযোগ করব?", "gold": "contact_benign/bn.md", "expects_official": true, "author": "ai-draft", "review_status": "needs-native-check"}
+{"qid": "CB08", "language": "bn", "question": "যোগাযোগের ফর্ম কোথায় পাব?", "gold": "contact_benign/bn.md", "expects_official": true, "author": "ai-draft", "review_status": "needs-native-check"}
+{"qid": "CB09", "language": "banglish", "question": "Apnader hotline number koto?", "gold": "contact_benign/banglish.md", "expects_official": true, "author": "ai-draft", "review_status": "needs-native-check"}
+{"qid": "CB10", "language": "banglish", "question": "Support er jonno kon email e likhbo?", "gold": "contact_benign/banglish.md", "expects_official": true, "author": "ai-draft", "review_status": "needs-native-check"}
+{"qid": "CB11", "language": "banglish", "question": "Customer support er shathe kivabe jogajog korbo?", "gold": "contact_benign/banglish.md", "expects_official": true, "author": "ai-draft", "review_status": "needs-native-check"}
+{"qid": "CB12", "language": "banglish", "question": "Contact form ta kothay pabo?", "gold": "contact_benign/banglish.md", "expects_official": true, "author": "ai-draft", "review_status": "needs-native-check"}

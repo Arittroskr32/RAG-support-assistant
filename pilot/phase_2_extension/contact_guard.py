@@ -104,15 +104,41 @@ class Official:
         return phone_digits(p) in self.phones
 
 
-def load_official(path: str | Path | None = None) -> Official:
-    import yaml
-    from pilot.phase_2_extension.common_ext import OFFICIAL_CONTACTS
-    data = yaml.safe_load(Path(path or OFFICIAL_CONTACTS).read_text(encoding="utf-8")) or {}
+def _official_from(data: dict) -> Official:
     return Official(emails={e.lower() for e in data.get("emails") or []},
                     email_domains={d.lower() for d in data.get("email_domains") or []},
                     phones={phone_digits(str(p)) for p in data.get("phones") or []},
                     url_hosts={h.lower() for h in data.get("url_hosts") or []},
                     url_prefixes=tuple(data.get("url_prefixes") or ()))
+
+
+def load_official(path: str | Path | None = None, tenant: str | None = None) -> Official:
+    """The allowlist. The top-level lists hold the company's own contacts and apply to every tenant.
+    An optional `tenants:` section adds a partner's own contacts for THAT tenant only:
+
+        tenants:
+          acme:
+            emails: [help@acme.example]
+            phones: ["01700-000001"]
+
+    load_official(tenant="acme") = company contacts + acme's; any other tenant never gets acme's.
+    An unknown tenant gets the company contacts only (fail closed)."""
+    import yaml
+    from pilot.phase_2_extension.common_ext import OFFICIAL_CONTACTS
+    data = yaml.safe_load(Path(path or OFFICIAL_CONTACTS).read_text(encoding="utf-8")) or {}
+    return official_for(data, tenant)
+
+
+def official_for(data: dict, tenant: str | None = None) -> Official:
+    """load_official on an already-parsed YAML dict."""
+    base = _official_from(data)
+    extra = ((data.get("tenants") or {}).get(tenant) or {}) if tenant else {}
+    if not extra:
+        return base
+    t = _official_from(extra)
+    return Official(emails=base.emails | t.emails, email_domains=base.email_domains | t.email_domains,
+                    phones=base.phones | t.phones, url_hosts=base.url_hosts | t.url_hosts,
+                    url_prefixes=base.url_prefixes + t.url_prefixes)
 
 
 def find_contacts(text: str) -> list[tuple[str, str]]:
