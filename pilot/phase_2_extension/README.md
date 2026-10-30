@@ -1,6 +1,6 @@
 # Pilot phase 2 extension
 
-This folder answers the senior's review of the full phase-2 report. The review is in `senior_review.md`, and the report it reviewed is `phase_2_full_report.md` (copied here unchanged as the base for the final report). `run.md` gives the GPU run order.
+This folder answers the senior's review of the full phase-2 report. The review is in `senior_review.md`, and the report it reviewed is `phase_2_full_report.md` (copied here unchanged as the base for the final report). `run.md` gives the GPU run order. The senior's final requests (paraphrase study, joined-carrier stack, contact-check stress test, frontier model) are in **`final_run.md`**.
 
 The code **reuses** `pilot/phase_2/` rather than copying it: `stack_ext.py` imports the phase-2 funnel, planting and answer checks from `stack_check2.py`, so both always measure the same thing. What **is** copied are the inputs (`inputs/`: the 80 items, the controls, the three valid-item lists and `calibration.json`), so every extension result has its inputs frozen next to it.
 
@@ -35,6 +35,10 @@ The code **reuses** `pilot/phase_2/` rather than copying it: `stack_ext.py` impo
 | `rq1_chunks.py` | φ, excess joint miss (family-clustered CIs) and CMH by language and goal for detector pairs, all languages and English only | output of `detectors_all` |
 | `stack_ext.py` | The phase-2 stack funnel plus `--isolate`, `--variant base_rate`, `--config bangla_serving_e5all`, and the contact check in shadow mode | Ollama, E5, the API stopped |
 | `analyze_ext.py` | Funnel split by goal, per-item table, ~br table, crossed and paraphrase generator tables → `results/phase2_extension_report.md` | stack_ext / run_generation outputs |
+| `make_items_ext.py human-template / human / table4` | Human-paraphrase sheet (`data/paraphrases_human.csv`), items from approved rows, Table 4 items for a frontier model | nothing |
+| `contact_stress.py` | Hard cases for the official-contact check (`data/contact_stress_cases.jsonl`, per-tenant cases) and benign answers that should contain an official contact | Ollama for `benign` |
+| `analyze_final.py` | Tables for the final runs → `results/final/final_tables.md` | final-run outputs |
+| `tests/test_final.py` | Tests for the final-run code | – |
 | `tests/test_ext.py` | 9 tests with the repo's fake KB, guardrail, LLM and a fake E5 | `python -m pytest -q pilot/phase_2_extension/tests` |
 
 ## Results already in `results/`

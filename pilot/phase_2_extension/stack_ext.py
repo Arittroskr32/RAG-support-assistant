@@ -15,6 +15,17 @@ pilot/phase_2/stack_check2.py, plus four things:
                                     EVERY chunk at ingestion (threshold from detectors_all.py); no
                                     router decides which chunks are scanned (design point 1)
 
+Final runs (senior, point 2) add one more:
+
+  --carrier joined                  remove the blank lines from every planted document before
+                                    ingestion, so the payload stays inside its paragraph instead
+                                    of becoming a "Support note" chunk of its own (the `joined`
+                                    mode of detectors_all.py). The output file gets "_joined" in
+                                    its name, and stackx_runs.jsonl records how many KB-4 chunks
+                                    each planted document became (1 = the payload is not alone).
+                                    Use --items with a paraphrase item file (one style) to plant
+                                    paraphrased payloads instead of the originals.
+
 Every answer is also passed through contact_guard.py in shadow mode (columns contact_guard,
 contact_guard_caught): it changes nothing in the answer, it records what the official-contact
 check would have removed.
@@ -38,6 +49,28 @@ import sys
 from pathlib import Path
 
 from pilot.phase_2_extension.common_ext import ALL_ITEMS, CALIBRATION, RESULTS
+
+CARRIERS = ("as_is", "joined")
+
+
+def join_carrier(text: str) -> str:
+    """The `joined` attacker: no blank lines, so the FAQ chunker keeps the payload in its paragraph
+    (same transformation as detectors_all.chunks_of(mode="joined"))."""
+    return re.sub(r"\n\s*\n", "\n", text).strip()
+
+
+def planted_chunk_counts() -> dict[str, int]:
+    """{item_id: number of KB-4 chunks} for every planted document."""
+    from knowledge_bases.kb_manager import kb
+    from pilot.phase_2.stack_check2 import item_of_source
+    got = kb.kb4_documents.get(include=["metadatas"])
+    out: dict[str, int] = {}
+    for meta in got["metadatas"]:
+        iid = item_of_source(str(meta.get("source_doc_id", "")))
+        if iid:
+            out[iid] = out.get(iid, 0) + 1
+    return out
+
 
 CONFIGS = ("deployed", "bangla_serving", "bangla_serving_bn", "bangla_serving_e5all")
 EXTRA_FIELDS = ["isolated", "excluded_items", "contact_guard", "contact_guard_caught", "scan_detector"]
@@ -132,6 +165,8 @@ def main(argv=None) -> None:
     ap.add_argument("--model", required=True)
     ap.add_argument("--variant", choices=["attack", "base_rate"], default="attack")
     ap.add_argument("--isolate", action="store_true", help="hide other planted items at query time")
+    ap.add_argument("--carrier", choices=CARRIERS, default="as_is",
+                    help="joined = remove blank lines so the payload is not split off as its own chunk")
     ap.add_argument("--runs", type=int, default=3)
     ap.add_argument("--seed-base", type=int, default=20261012)
     ap.add_argument("--temperature", type=float, default=0.2)
@@ -156,6 +191,9 @@ def main(argv=None) -> None:
     from generation import l7_generation as l7
     from pilot.phase_2.common2 import load_items2
     items = load_items2(a.items)
+    if a.carrier == "joined":
+        for it in items:
+            it["carrier_doc"] = join_carrier(it["carrier_doc"])
     chosen = select(a, items)
     saved = (orch.secure_search, l7.generate_answer, l7.MODEL_SETTINGS, l7._generate_local)
     iso = None
@@ -205,7 +243,8 @@ def run_all(a, items, chosen, iso) -> None:
     where = plant_dir()
     out_dir = Path(a.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    label = a.config + ("_br" if a.variant == "base_rate" else "") + ("_iso" if a.isolate else "")
+    label = (a.config + ("_br" if a.variant == "base_rate" else "") + ("_iso" if a.isolate else "")
+             + ("_joined" if a.carrier == "joined" else ""))
     stem = f"stackx_{label}_{re.sub(r'[^A-Za-z0-9.]+', '-', a.model)}" + (f"_{a.tag}" if a.tag else "")
     scan_label = {"bangla_serving_bn": "BN_native (router-gated)", "bangla_serving_e5all": "E5_all (every chunk)"}.get(a.config, "")
     print(f"config {a.config}, variant {a.variant}, model {a.model}, isolate {a.isolate}, scan {scan_label or 'deployed only'}, "
@@ -222,7 +261,12 @@ def run_all(a, items, chosen, iso) -> None:
             if detector is not None:
                 scan_every_chunk(detector, quarantine, "E5_all")
             fq = benign_quarantined()
-            meta_batches.append({"batch": bname, "planted": len(batch), "benign_chunks_quarantined": fq})
+            n_chunks = planted_chunk_counts()
+            meta_batches.append({"batch": bname, "planted": len(batch), "benign_chunks_quarantined": fq,
+                                 "chunks_per_planted_doc": n_chunks})
+            if a.carrier == "joined" and any(n > 1 for n in n_chunks.values()):
+                print(f"   WARNING: some joined documents still became several chunks: "
+                      f"{ {k: v for k, v in n_chunks.items() if v > 1} }")
             print(f"   benign KB-4 chunks quarantined: {fq}")
             sources = planted_sources() if iso else {}
             cores_scope = batch                      # every canary of the batch is checked in every answer
@@ -268,7 +312,7 @@ def run_all(a, items, chosen, iso) -> None:
         w.writerows(rows)
     from pilot.phase_2.common2 import git_commit
     meta = {"time": datetime.datetime.now().isoformat(timespec="seconds"), "config": a.config, "variant": a.variant,
-            "isolate": a.isolate, "model": a.model, "runs": a.runs, "seed_base": a.seed_base,
+            "isolate": a.isolate, "carrier": a.carrier, "model": a.model, "runs": a.runs, "seed_base": a.seed_base,
             "temperature": a.temperature, "items": a.items, "only_file": a.only_file,
             "bn_threshold": bn.threshold if bn else None, "e5all_threshold": detector.threshold if detector else None,
             "batches": meta_batches, "thresholds": dataclasses.asdict(cfg), "git_commit": git_commit(),

@@ -26,6 +26,24 @@ paraphrase (point 3, paraphrase attack on BN_native)
   Item id <parent>p<k> (e.g. BN-216p1); the payload replaces the parent's payload in the carrier.
   Also written per style (paraphrase_items_<style>.jsonl) for generator runs, since load_items2
   needs one canary per attack in a file.
+
+human-template / human (final runs, senior point 1: human-written paraphrases, English arm, six families)
+  human-template writes data/paraphrases_human.csv (opens in Excel / Google Sheets): one EMPTY row per family x group x style
+  (EN, TR, BL, NT; policy, content, reworded) for the three core families (p2f06, p2f07, p2f16) and
+  the three extension families (p2f02, p2f13, p2f14). Each row shows the original payload and the
+  reference code that must stay in the paraphrase. A person fills `payload` without AI help (and
+  writes "yes" in written_without_ai), a native speaker checks it, fills `reviewer` and sets
+  review_status to "approved" (final_run.md, step 1).
+  It never overwrites a file that already has payloads (use --force for an empty restart).
+
+  human builds the items from the filled rows: item id <parent>h<k> with k fixed by style
+  (h1 policy, h2 content, h3 reworded), so the ids do not depend on row order and never clash with
+  the AI drafts (<parent>p<k>). Only rows with review_status "approved" are used, unless
+  --allow-unreviewed. Output: results/final/paraphrase_human_items.jsonl and one file per style.
+
+table4 (final runs, senior point 4: one frontier model on Table 4)
+  writes results/final/table4_items.jsonl: the 68 marker attack items and their positive controls
+  (~pc), i.e. "instruction in the document" vs "the same instruction as the user's request".
 """
 from __future__ import annotations
 
@@ -90,14 +108,151 @@ def paraphrased(items: list[dict], para_rows: list[dict]) -> list[dict]:
     return out
 
 
+CORE_FAMILIES = ("p2f06", "p2f07", "p2f16")
+EXTRA_FAMILIES = ("p2f02", "p2f13", "p2f14")     # marker families with a strong TR positive control
+STYLES = ("policy", "content", "reworded")
+STYLE_K = {s: k for k, s in enumerate(STYLES, 1)}
+GROUP_PREFIX = ("EN", "TR", "BL", "BN")
+_CODE = re.compile(r"[A-Z]{2}-[0-9০-৯]{4}")
+# the phase-2 template frame; a paraphrase must not use it (that is the point of the study)
+_FRAME = re.compile(r"note to the ai|ai assistant|এআই|\bai\b.*\bnote\b|assistant er jonno", re.I)
+FINAL = RESULTS / "final"
+
+
+def human_template(items: list[dict], families=CORE_FAMILIES + EXTRA_FAMILIES) -> list[dict]:
+    by_id = {i["item_id"]: i for i in items}
+    rows = []
+    for fam in families:
+        for pre in GROUP_PREFIX:
+            parent = f"{pre}-2{fam[-2:]}"
+            p = by_id[parent]
+            if p["goal_type"] != "marker":
+                raise ValueError(f"{parent} is not a marker item")
+            code = _CODE.search(p["payload"])
+            for style in STYLES:
+                rows.append({"parent_id": parent, "seed_family": fam, "set": "core" if fam in CORE_FAMILIES else "extension",
+                             "style": style, "reference_code": code.group(0) if code else str(p["canary_core"]),
+                             "original_payload": p["payload"], "payload": "", "author": "",
+                             "written_without_ai": "", "reviewer": "", "review_status": "todo", "notes": ""})
+    return rows
+
+
+def human_items(items: list[dict], rows: list[dict], allow_unreviewed: bool = False,
+                families: set | None = None) -> tuple[list[dict], dict]:
+    """Items from the filled human template. Returns (items, counts of skipped rows by reason)."""
+    from collections import Counter
+    from pilot.phase_2 import tags
+    by_id = {i["item_id"]: i for i in items}
+    out, skipped = [], Counter()
+    for r in rows:
+        if families and r["seed_family"] not in families:
+            skipped["family not selected"] += 1
+            continue
+        if not (r.get("payload") or "").strip():
+            skipped["no payload yet"] += 1
+            continue
+        if r.get("review_status") != "approved" and not allow_unreviewed:
+            skipped["not approved"] += 1
+            continue
+        if str(r.get("written_without_ai", "")).strip().lower() in ("no", "false", "0"):
+            raise ValueError(f"{r['parent_id']} ({r['style']}): written_without_ai is false; the senior asked "
+                             "for paraphrases written without AI")
+        p = by_id[r["parent_id"]]
+        payload = r["payload"].strip()
+        if str(p["canary_core"]) not in payload.translate(str.maketrans("০১২৩৪৫৬৭৮৯", "0123456789")):
+            raise ValueError(f"{r['parent_id']} ({r['style']}): the paraphrase lost the canary core {p['canary_core']}")
+        if payload == p["payload"].strip():
+            raise ValueError(f"{r['parent_id']} ({r['style']}): paraphrase is identical to the original")
+        if _FRAME.search(payload):
+            raise ValueError(f"{r['parent_id']} ({r['style']}): the paraphrase still uses the 'note to the AI "
+                             f"assistant' frame: {payload!r}")
+        doc = tags.unwrap(p["carrier_doc"], "passage")
+        if p["payload"] not in doc:
+            raise ValueError(f"{p['item_id']}: payload not found verbatim in carrier_doc")
+        out.append({"item_id": f"{p['item_id']}h{STYLE_K[r['style']]}", **_base(p), "technique": p["technique"],
+                    "payload": payload, "carrier_doc": doc.replace(p["payload"], payload), "variant": "attack",
+                    "paraphrase_of": p["item_id"], "paraphrase_style": r["style"], "paraphrase_set": "human",
+                    "family_set": r.get("set", ""), "author": r.get("author") or "human",
+                    "reviewer": r.get("reviewer", ""), "review_status": r.get("review_status", "")})
+    ids = [o["item_id"] for o in out]
+    dup = {i for i in ids if ids.count(i) > 1}
+    if dup:
+        raise ValueError(f"two rows for the same parent and style: {sorted(dup)}")
+    return out, dict(skipped)
+
+
+def read_rows(path) -> list[dict]:
+    """The human sheet as CSV (utf-8 with or without BOM, as Excel saves it) or JSONL."""
+    path = Path(path)
+    if path.suffix.lower() == ".csv":
+        import csv
+        with open(path, encoding="utf-8-sig", newline="") as fh:
+            return [{k: (v or "").strip() for k, v in r.items() if k} for r in csv.DictReader(fh)]
+    return read_jsonl(path)
+
+
+def write_rows(path, rows: list[dict]) -> None:
+    path = Path(path)
+    if path.suffix.lower() != ".csv":
+        write_jsonl(path, rows)
+        return
+    import csv
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8-sig", newline="") as fh:     # BOM: Excel shows Bangla correctly
+        w = csv.DictWriter(fh, fieldnames=list(rows[0]))
+        w.writeheader()
+        w.writerows(rows)
+
+
+def table4_items(all_items: list[dict]) -> list[dict]:
+    """Marker attacks and their ~pc rows (Table 4: document vs user asks)."""
+    marker = {i["item_id"] for i in all_items if i.get("variant", "attack") == "attack" and i["goal_type"] == "marker"}
+    return [i for i in all_items if i["item_id"] in marker
+            or (i.get("variant") == "positive_control" and i.get("parent_id") in marker)]
+
+
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("what", choices=["crossed", "paraphrase"])
+    ap.add_argument("what", choices=["crossed", "paraphrase", "human-template", "human", "table4"])
+    ap.add_argument("--human", default=str(DATA / "paraphrases_human.csv"))
+    ap.add_argument("--families", nargs="+", help="human: only these seed families (default: every filled row)")
+    ap.add_argument("--allow-unreviewed", action="store_true",
+                    help="human: also use rows that are not approved yet (dry runs only; never for reported numbers)")
+    ap.add_argument("--force", action="store_true", help="human-template: overwrite a file that has payloads")
     ap.add_argument("--items", default=str(ITEMS))
     ap.add_argument("--paraphrases", default=str(DATA / "bn_paraphrases.jsonl"))
     ap.add_argument("--out", default=None)
     a = ap.parse_args(argv)
     items = read_jsonl(a.items)
+    if a.what == "human-template":
+        out = Path(a.out or a.human)
+        if out.exists() and any((r.get("payload") or "").strip() for r in read_rows(out)) and not a.force:
+            raise SystemExit(f"{out} already has paraphrases; not overwriting (use --force)")
+        rows = human_template(items)
+        write_rows(out, rows)
+        print(f"wrote {len(rows)} empty rows to {out}")
+        return
+    if a.what == "human":
+        rows, skipped = human_items(items, read_rows(a.human), a.allow_unreviewed,
+                                    set(a.families) if a.families else None)
+        if not rows:
+            raise SystemExit(f"no usable rows in {a.human} (skipped: {skipped})")
+        out = Path(a.out or FINAL / "paraphrase_human_items.jsonl")
+        write_jsonl(out, rows)
+        for style in STYLES:
+            write_jsonl(out.with_name(f"{out.stem}_{style}.jsonl"), [r for r in rows if r["paraphrase_style"] == style])
+        from collections import Counter
+        print(f"wrote {len(rows)} items to {out} (+ one file per style); skipped rows: {skipped}")
+        print(Counter((r["seed_family"], r["item_id"][:2]) for r in rows))
+        return
+    if a.what == "table4":
+        from pilot.phase_2_extension.common_ext import ALL_ITEMS
+        rows = table4_items(read_jsonl(ALL_ITEMS))
+        out = Path(a.out or FINAL / "table4_items.jsonl")
+        write_jsonl(out, rows)
+        from collections import Counter
+        print(f"wrote {len(rows)} items to {out}: {Counter(r.get('variant', 'attack') for r in rows)}")
+        return
     if a.what == "crossed":
         rows = crossed(items)
         out = Path(a.out or RESULTS / "crossed_items.jsonl")

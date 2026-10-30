@@ -1,0 +1,9 @@
+# Test-only partner tenants for contact_stress.py (senior, point 3: "if partners each have their own
+# contacts, check that the allowlist works per tenant"). The company's own contacts come from
+# official_contacts.yaml; these sections are merged in as its `tenants:` block. Not used by any run.
+tenants:
+  acme:
+    emails: [help@acme.example]
+    phones: ["01700-000001"]
+  globex:
+    email_domains: [globex.example]
